@@ -1,19 +1,8 @@
 {
   "employees": [
-    { "id": 1, "name": "Alijon Valiyev", "department": "Mexanika" },
-    { "id": 2, "name": "Bahrom Karimov", "department": "Mexanika" },
-    { "id": 3, "name": "Dilshod Rahimov", "department": "Elektr" },
-    { "id": 4, "name": "Feruza To‘rayeva", "department": "Elektr" },
-    { "id": 5, "name": "Gulnora Akbarova", "department": "Montaj" },
-    { "id": 6, "name": "Hasan Aliyev", "department": "Montaj" },
-    { "id": 7, "name": "Ikrom Rasulov", "department": "Mexanika" },
-    { "id": 8, "name": "Jasur Abdurahmonov", "department": "Elektr" },
-    { "id": 9, "name": "Kamola Saidova", "department": "Montaj" },
-    { "id": 10, "name": "Lobar Xolmatova", "department": "Mexanika" },
-    { "id": 11, "name": "Murodjon Botirov", "department": "Elektr" },
-    { "id": 12, "name": "Nodira Jo‘rayeva", "department": "Montaj" },
-    { "id": 13, "name": "Otabek Toshmatov", "department": "Mexanika" },
-    { "id": 14, "name": "Rustam Qodirov", "department": "Elektr" },
-    { "id": 15, "name": "Sevara Umarova", "department": "Montaj" }
+    { "id": 1, "name": "Alijon Valiyev", "position": "Muhandis", "department": "Mexanika" },
+    { "id": 2, "name": "Bahrom Karimov", "position": "Texnik", "department": "Mexanika" },
+    { "id": 3, "name": "Dilshod Rahimov", "position": "Elektr xavfsizligi", "department": "Elektr" },
+    { "id": 4, "name": "Feruza To‘rayeva", "position": "Dasturchi", "department": "IT" }
   ]
 }
