@@ -3,6 +3,8 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const { createWriteStream } = require('fs');
+const { unlink } = require('fs').promises;
 
 // -------------------- KONFIGURATSIYA --------------------
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -119,7 +121,7 @@ function escapeHtml(str) {
     });
 }
 
-// -------------------- CSV GENERATSIYA (BOMsiz, to'g'ri buffer) --------------------
+// -------------------- CSV GENERATSIYA (string) --------------------
 function generateTeamsCSV() {
     let csv = "Jamoa nomi,Sardor,A'zolar (5 kishi)\n";
     if (db.teams.length > 0) {
@@ -141,6 +143,18 @@ function generateIndividualsCSV() {
         }).join('\n');
     }
     return csv;
+}
+
+// -------------------- VAQTINCHALIK FAYL ORQALI YUBORISH (Buffer xatosini bartaraf qiladi) --------------------
+async function sendFileFromString(chatId, content, filename, mimeType) {
+    const tempFilePath = path.join(__dirname, `temp_${Date.now()}_${filename}`);
+    try {
+        await fs.writeFile(tempFilePath, content, 'utf8');
+        const fileStream = require('fs').createReadStream(tempFilePath);
+        await bot.sendDocument(chatId, fileStream, { filename, contentType: mimeType });
+    } finally {
+        try { await fs.unlink(tempFilePath); } catch(e) {}
+    }
 }
 
 // -------------------- PDF ARIZA --------------------
@@ -215,7 +229,6 @@ async function generateApplicationPDF(team) {
 // -------------------- XODIMLARNI CSV DAN YANGILASH --------------------
 async function updateEmployeesFromCSV(fileBuffer) {
     let content = fileBuffer.toString('utf8');
-    // BOM ni olib tashlash
     if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
     const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) throw new Error('CSVda kamida 2 qator bo‘lishi kerak');
@@ -237,19 +250,16 @@ async function updateEmployeesFromCSV(fileBuffer) {
     }
     if (newEmployees.length === 0) throw new Error('Hech qanday xodim topilmadi');
 
-    // Eski ID -> yangi ID mapping
     const oldToNewId = new Map();
     for (let i = 0; i < employees.employees.length && i < newEmployees.length; i++) {
         if (employees.employees[i] && newEmployees[i]) {
             oldToNewId.set(employees.employees[i].id, newEmployees[i].id);
         }
     }
-    // Jamoalarni yangilash
     for (const team of db.teams) {
         if (oldToNewId.has(team.captainId)) team.captainId = oldToNewId.get(team.captainId);
         team.members = team.members.map(mid => oldToNewId.has(mid) ? oldToNewId.get(mid) : mid);
     }
-    // Yakkalarni yangilash
     for (const ind of db.individuals) {
         if (oldToNewId.has(ind.employeeId)) ind.employeeId = oldToNewId.get(ind.employeeId);
     }
@@ -318,7 +328,6 @@ async function finalizeTeam(chatId, userId, teamData) {
     await saveDB();
 
     const pdfBuffer = await generateApplicationPDF(newTeam);
-    // Buffer to'g'riligi tekshiriladi
     if (!Buffer.isBuffer(pdfBuffer)) throw new Error('PDF buffer emas');
     await bot.sendDocument(chatId, pdfBuffer, {
         filename: `ariya_${newTeam.teamId}.pdf`,
@@ -394,9 +403,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 try {
                     await bot.sendMessage(chatId, "⏳ CSV tayyorlanmoqda...");
                     const csv = generateTeamsCSV();
-                    const buffer = Buffer.from(csv, 'utf8');
-                    if (!Buffer.isBuffer(buffer)) throw new Error('Buffer yaratilmadi');
-                    await bot.sendDocument(chatId, buffer, { filename: 'jamoalar.csv', contentType: 'text/csv; charset=utf-8' });
+                    await sendFileFromString(chatId, csv, 'jamoalar.csv', 'text/csv; charset=utf-8');
                     await bot.sendMessage(chatId, `✅ ${db.teams.length} ta jamoa eksport qilindi.`);
                 } catch (err) {
                     console.error(err);
@@ -407,8 +414,7 @@ bot.on('callback_query', async (callbackQuery) => {
             if (data === 'admin_export_individuals') {
                 try {
                     const csv = generateIndividualsCSV();
-                    const buffer = Buffer.from(csv, 'utf8');
-                    await bot.sendDocument(chatId, buffer, { filename: 'yakkalar.csv', contentType: 'text/csv; charset=utf-8' });
+                    await sendFileFromString(chatId, csv, 'yakkalar.csv', 'text/csv; charset=utf-8');
                     await bot.sendMessage(chatId, `✅ ${db.individuals.length} ta yakka eksport qilindi.`);
                 } catch (err) {
                     await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
@@ -418,8 +424,7 @@ bot.on('callback_query', async (callbackQuery) => {
             if (data === 'admin_export_json') {
                 try {
                     const jsonData = JSON.stringify(db.teams, null, 2);
-                    const buffer = Buffer.from(jsonData, 'utf8');
-                    await bot.sendDocument(chatId, buffer, { filename: 'jamoalar.json', contentType: 'application/json' });
+                    await sendFileFromString(chatId, jsonData, 'jamoalar.json', 'application/json');
                     await bot.sendMessage(chatId, "✅ JSON yuklab olindi.");
                 } catch (err) {
                     await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
