@@ -531,48 +531,55 @@ bot.on('callback_query', async (callbackQuery) => {
         }
 
         // ---------- YAKKA RO'YXAT ----------
-        if (data.startsWith('dept_individual_')) {
-            const department = data.split('_')[2];
-            if (!session || session.step !== 'individual') {
-                await bot.sendMessage(chatId, "Iltimos, avval 'Yakka ro'yxat' tugmasini bosing.");
-                return bot.answerCallbackQuery(callbackQuery.id);
-            }
-            const available = getAvailableEmployeesByDepartment(department, []);
-            if (available.length === 0) {
-                await bot.sendMessage(chatId, "Bu bo'limda mavjud xodim yo'q.");
-                return bot.answerCallbackQuery(callbackQuery.id);
-            }
-            const empButtons = available.map(emp => ([{ text: emp.name, callback_data: `ind_emp_${emp.id}` }]));
-            empButtons.push([{ text: "⬅️ Orqaga", callback_data: "back_departments_ind" }]);
-            await bot.sendMessage(chatId, "O‘zingizni tanlang:", { reply_markup: { inline_keyboard: empButtons } });
-            return bot.answerCallbackQuery(callbackQuery.id);
-        }
-        if (data.startsWith('ind_emp_')) {
-            const employeeId = parseInt(data.split('_')[2]);
-            if (!isEmployeeAvailable(employeeId)) {
-                await bot.sendMessage(chatId, "Bu xodim allaqachon ro'yxatdan o'tgan.");
-                userSessions.delete(chatId);
-                return bot.answerCallbackQuery(callbackQuery.id);
-            }
-            db.individuals.push({ employeeId, registeredAt: new Date().toISOString(), telegramUserId: userId });
-            await saveDB();
-            await bot.sendMessage(chatId, "✅ Siz yakka tartibda ro'yxatdan o'tdingiz. Admin sizni jamoada guruhlaydi.", getMainMenuKeyboard());
-            userSessions.delete(chatId);
-            return bot.answerCallbackQuery(callbackQuery.id);
-        }
-        if (data === 'back_departments_ind') {
-            if (session && session.step === 'individual') {
-                await askDepartment(chatId, 'individual');
-            }
-            return bot.answerCallbackQuery(callbackQuery.id);
-        }
-
-    } catch (err) {
-        console.error('Callback xatosi:', err);
-        await bot.sendMessage(chatId, `❌ Xatolik yuz berdi: ${err.message}`);
+       // ---------- YAKKA RO'YXAT ----------
+if (data.startsWith('dept_individual_')) {
+    const department = data.split('_')[2];
+    if (!session || session.step !== 'individual') {
+        await bot.sendMessage(chatId, "❌ Iltimos, avval 'Yakka ro'yxat' tugmasini bosing.");
+        return bot.answerCallbackQuery(callbackQuery.id);
     }
-    bot.answerCallbackQuery(callbackQuery.id);
-});
+    const available = getAvailableEmployeesByDepartment(department, []);
+    if (available.length === 0) {
+        await bot.sendMessage(chatId, "❌ Bu bo'limda mavjud xodim yo'q.");
+        return bot.answerCallbackQuery(callbackQuery.id);
+    }
+    const empButtons = available.map(emp => ([{ text: emp.name, callback_data: `ind_emp_${emp.id}` }]));
+    empButtons.push([{ text: "⬅️ Orqaga", callback_data: "back_departments_ind" }]);
+    await bot.sendMessage(chatId, "📌 O‘zingizni tanlang:", { reply_markup: { inline_keyboard: empButtons } });
+    return bot.answerCallbackQuery(callbackQuery.id);
+}
+
+if (data.startsWith('ind_emp_')) {
+    const employeeId = parseInt(data.split('_')[2]);
+    if (!isEmployeeAvailable(employeeId)) {
+        await bot.sendMessage(chatId, "❌ Bu xodim allaqachon ro'yxatdan o'tgan.");
+        userSessions.delete(chatId);
+        return bot.answerCallbackQuery(callbackQuery.id);
+    }
+    db.individuals.push({ 
+        employeeId, 
+        registeredAt: new Date().toISOString(), 
+        telegramUserId: userId 
+    });
+    await saveDB();
+
+    // ✅ Kutilgan xabar matni
+    await bot.sendMessage(
+        chatId,
+        "✅ Siz random usulida jamoa tanlashga qabul qilindingiz!\n\n📌 Admin sizni boshqa yakka ishtirokchilar bilan guruhlab, tasodifiy jamoa tuzadi. Natijalar haqida xabar beriladi.",
+        getMainMenuKeyboard()
+    );
+
+    userSessions.delete(chatId);
+    return bot.answerCallbackQuery(callbackQuery.id);
+}
+
+if (data === 'back_departments_ind') {
+    if (session && session.step === 'individual') {
+        await askDepartment(chatId, 'individual');
+    }
+    return bot.answerCallbackQuery(callbackQuery.id);
+}
 
 // -------------------- MATNLI XABARLAR --------------------
 bot.on('message', async (msg) => {
