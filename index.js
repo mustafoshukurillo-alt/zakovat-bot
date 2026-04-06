@@ -186,22 +186,28 @@ function getMainMenuKeyboard() {
                 [{ text: "👤 Individual ro'yxatga olish" }],
                 [{ text: "📄 Mening jamoam" }, { text: "ℹ️ Yordam" }]
             ],
+        
             resize_keyboard: true
         }
     };
 }
 
 // -------------------- BO'LIMLARNI KO'RSATISH (inline) --------------------
+// -------------------- BO'LIMLARNI KO'RSATISH (inline, bir nechta xabar) --------------------
 async function showDepartments(chatId, prefix) {
-    const buttons = [];
-    for (let i = 0; i < DEPARTMENTS_LIST.length; i += 2) {
+    const chunkSize = 10; // har xabarda maksimal tugma soni
+    for (let i = 0; i < DEPARTMENTS_LIST.length; i += chunkSize) {
+        const chunk = DEPARTMENTS_LIST.slice(i, i + chunkSize);
+        const buttons = [];
+        for (let j = 0; j < chunk.length; j += 2) {
         const row = [];
-        row.push({ text: DEPARTMENTS_LIST[i], callback_data: `${prefix}_${DEPARTMENTS_LIST[i]}` });
-        if (i+1 < DEPARTMENTS_LIST.length) row.push({ text: DEPARTMENTS_LIST[i+1], callback_data: `${prefix}_${DEPARTMENTS_LIST[i+1]}` });
+        row.push({ text: chunk[j], callback_data: `${prefix}_${chunk[j]}` });
+        if (j + 1 < chunk.length) row.push({ text: chunk[j+1], callback_data: `${prefix}_${chunk[j+1]}` });
         buttons.push(row);
+}
+buttons.push([{ text: "❌ Bekor qilish", callback_data: "cancel" }]);
+        await bot.sendMessage(chatId, "📌 Iltimos, bo'limni tanlang:", { reply_markup: { inline_keyboard: buttons } });
     }
-    buttons.push([{ text: "❌ Bekor qilish", callback_data: "cancel" }]);
-    await bot.sendMessage(chatId, "📌 Iltimos, bo'limni tanlang:", { reply_markup: { inline_keyboard: buttons } });
 }
 
 // -------------------- JAMOA YARATISH --------------------
