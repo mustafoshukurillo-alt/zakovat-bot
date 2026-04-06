@@ -71,24 +71,20 @@ function getDepartments() {
 }
 
 // -------------------- XODIMLARNI HARF GURUHI BO'YICHA OLISH --------------------
-// Harf guruhlari: A-B, C-D, E-F, G-H, I-J, K-L, M-N, O-P, Q-R, S-T, U-V, X-Y, Z
 function getLetterGroup(letter) {
     const upper = letter.toUpperCase();
-    if ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.includes(upper)) {
-        if (upper <= 'B') return 'A-B';
-        if (upper <= 'D') return 'C-D';
-        if (upper <= 'F') return 'E-F';
-        if (upper <= 'H') return 'G-H';
-        if (upper <= 'J') return 'I-J';
-        if (upper <= 'L') return 'K-L';
-        if (upper <= 'N') return 'M-N';
-        if (upper <= 'P') return 'O-P';
-        if (upper <= 'R') return 'Q-R';
-        if (upper <= 'T') return 'S-T';
-        if (upper <= 'V') return 'U-V';
-        if (upper <= 'Y') return 'X-Y';
-        return 'Z';
-    }
+    if (upper <= 'B') return 'A-B';
+    if (upper <= 'D') return 'C-D';
+    if (upper <= 'F') return 'E-F';
+    if (upper <= 'H') return 'G-H';
+    if (upper <= 'J') return 'I-J';
+    if (upper <= 'L') return 'K-L';
+    if (upper <= 'N') return 'M-N';
+    if (upper <= 'P') return 'O-P';
+    if (upper <= 'R') return 'Q-R';
+    if (upper <= 'T') return 'S-T';
+    if (upper <= 'V') return 'U-V';
+    if (upper <= 'Y') return 'X-Y';
     return 'Z';
 }
 function getEmployeesByLetterGroup(department, group, excludeIds = []) {
@@ -281,10 +277,10 @@ function getMainMenuKeyboard() {
 async function showDepartments(chatId, action, teamCreationData, userId) {
     const departments = getDepartments();
     if (departments.length === 0) {
-        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Admin xodimlarni yuklamagan.");
+        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Iltimos, admin bilan bog‘laning yoki admin paneli orqali xodimlarni yuklang.");
+        userSessions.delete(chatId);
         return;
     }
-    // Har bir qatorda 2 ta bo'limdan chiqaramiz
     const buttons = [];
     for (let i = 0; i < departments.length; i += 2) {
         const row = [];
@@ -308,7 +304,7 @@ async function showLetterGroups(chatId, department, action, teamCreationData, us
     const groups = ['A-B', 'C-D', 'E-F', 'G-H', 'I-J', 'K-L', 'M-N', 'O-P', 'Q-R', 'S-T', 'U-V', 'X-Y', 'Z'];
     const buttons = groups.map(g => ([{ text: g, callback_data: `letter_${action}_${department}_${g}` }]));
     buttons.push([{ text: "⬅️ Bo'limlarga qaytish", callback_data: "back_to_departments" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
-    await bot.sendMessage(chatId, `🔤 "${department}" bo‘limidagi xodimlarni tanlash uchun xodimning familiyasi boshlanadigan harf guruhini tanlang:`, { reply_markup: { inline_keyboard: buttons } });
+    await bot.sendMessage(chatId, `🔤 "${department}" bo‘limidagi xodimlarni tanlash uchun harf guruhini tanlang:`, { reply_markup: { inline_keyboard: buttons } });
     userSessions.set(chatId, {
         step: 'selecting_letter',
         action: action,
@@ -324,7 +320,6 @@ async function showEmployeesByGroup(chatId, department, group, action, teamCreat
     const employeesList = getEmployeesByLetterGroup(department, group, excludeIds);
     if (employeesList.length === 0) {
         await bot.sendMessage(chatId, `❌ "${group}" harf guruhida mavjud xodim yo‘q.`);
-        // Qaytadan harf guruhlarini ko'rsatamiz
         await showLetterGroups(chatId, department, action, teamCreationData, userId, excludeIds);
         return;
     }
@@ -507,7 +502,6 @@ bot.on('callback_query', async (query) => {
             if (action === 'captain') {
                 teamData.captainId = employeeId;
                 teamData.members.push(employeeId);
-                // A'zo qo'shishga o'tamiz
                 if (teamData.members.length === 5) {
                     await finalizeTeam(chatId, session.userId, teamData);
                 } else {
@@ -630,6 +624,13 @@ bot.on('message', async (msg) => {
     if (session && session.step === 'awaiting_team_name') {
         if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
         session.teamCreationData.teamName = text;
+        // Bo‘limlar mavjudligini tekshirish
+        const departments = getDepartments();
+        if (departments.length === 0) {
+            await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo‘lim mavjud emas. Iltimos, admin xodimlarni yuklaguncha kuting yoki /cancel buyrug‘i bilan bekor qiling.");
+            userSessions.delete(chatId);
+            return;
+        }
         session.step = 'selecting_department';
         session.action = 'captain';
         session.excludeIds = [];
