@@ -23,6 +23,43 @@ let db = { teams: [], individuals: [], registrationOpen: true };
 let employees = { employees: [] };
 const userSessions = new Map();
 
+// -------------------- BO'LIMLARNI QATTIQ BELGILANG (xodimlardan mustaqil) --------------------
+const DEPARTMENTS_LIST = [
+    "Asbobsozlik sexi",
+    "Avtobuslar yig'ish sexi",
+    "Axborot-kommunikatsiya texnologiyalari va axborot xavfsizligi bo'limi",
+    "Bo'yash sexi",
+    "Buxgalteriya hisobi departamenti",
+    "Elektr jabduqlar ishlab chiqarish sexi",
+    "ERP-mahsulotni boshqarish bo'limi",
+    "Integratsiya guruhi",
+    "Integratsiyalashgan boshqaruv tizimi bo'limi",
+    "Ishlab chiqarish jarayonlarini optimallashtirish bo'limi",
+    "Ishlab chiqarish-mexanika sexi",
+    "Ishlab chiqarishni rejalashtirish departamenti",
+    "Istiqbol ishlanmalar departamenti",
+    "Konstruktorlik ishlanmalar departamenti",
+    "Kuzovlar ishlab chiqarish sexi",
+    "Ma'muriy masalalar departamenti",
+    "Markaziy zavod laboratoriyasi",
+    "Marketing departamenti",
+    "Mehnat muhofazasi, texnika xavfsizligi va yong'in xavfsizligi bo'limi",
+    "Moddiy ta'minot departamenti",
+    "Moliya-iqtisod departamenti",
+    "Muhandislik ta'minoti departamenti",
+    "Payvandlash sexi",
+    "Plastmass detallar ishlab chiqarish sexi",
+    "Rahbarlar yordamchilari",
+    "Savdo va sotishdan keyingi xizmat departamenti",
+    "Sifat nazorati departamenti",
+    "Shassi va kabinalarni yig'ish sexi",
+    "Tayyorlov sexi",
+    "Texnologik ta'minot departamenti",
+    "Xavfsizlik bo'limi",
+    "Xodimlarni boshqarish (HR) departamenti",
+    "Yuk avtomobillari kuzovlarini yig'ish sexi"
+];
+
 // -------------------- YUKLASH VA SAQLASH --------------------
 async function loadData() {
     try {
@@ -39,8 +76,13 @@ async function loadData() {
         if (!employees.employees) employees.employees = [];
         console.log('✅ employees.json yuklandi, xodimlar soni:', employees.employees.length);
     } catch (err) {
-        console.error('employees.json yuklashda xatolik:', err.message);
-        employees = { employees: [] };
+        console.error('employees.json yuklashda xatolik, namunaviy xodimlar yaratiladi:', err.message);
+        // Namunaviy xodimlar (hech bo'lmaganda test qilish uchun)
+        employees = {
+            employees: [
+                { id: 1, name: "Testov Test", position: "Test", department: "Ishlab chiqarishni rejalashtirish departamenti" }
+            ]
+        };
         await saveEmployees();
     }
 }
@@ -66,27 +108,11 @@ function getEmployeeDepartment(id) {
     return emp ? emp.department : '';
 }
 function getDepartments() {
-    const deps = new Set(employees.employees.map(e => e.department));
-    return Array.from(deps).sort();
+    // Qattiq belgilangan bo'limlar ro'yxatini qaytar
+    return DEPARTMENTS_LIST;
 }
 
 // -------------------- XODIMLARNI HARF GURUHI BO'YICHA OLISH --------------------
-function getLetterGroup(letter) {
-    const upper = letter.toUpperCase();
-    if (upper <= 'B') return 'A-B';
-    if (upper <= 'D') return 'C-D';
-    if (upper <= 'F') return 'E-F';
-    if (upper <= 'H') return 'G-H';
-    if (upper <= 'J') return 'I-J';
-    if (upper <= 'L') return 'K-L';
-    if (upper <= 'N') return 'M-N';
-    if (upper <= 'P') return 'O-P';
-    if (upper <= 'R') return 'Q-R';
-    if (upper <= 'T') return 'S-T';
-    if (upper <= 'V') return 'U-V';
-    if (upper <= 'Y') return 'X-Y';
-    return 'Z';
-}
 function getEmployeesByLetterGroup(department, group, excludeIds = []) {
     let letters;
     if (group === 'A-B') letters = ['A','B'];
@@ -103,8 +129,8 @@ function getEmployeesByLetterGroup(department, group, excludeIds = []) {
     else if (group === 'X-Y') letters = ['X','Y'];
     else letters = ['Z'];
     
-    return employees.employees.filter(emp =>
-        emp.department === department &&
+    const deptEmployees = employees.employees.filter(emp => emp.department === department);
+    return deptEmployees.filter(emp =>
         letters.some(l => emp.name.charAt(0).toUpperCase() === l) &&
         isEmployeeAvailable(emp.id) &&
         !excludeIds.includes(emp.id)
@@ -192,7 +218,7 @@ async function generateApplicationPDF(team) {
         doc.on('data', chunk => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
-        doc.fontSize(18).text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
+        doc.fontSize(18).text('SAMAUTO ZAKOVAT TURNIRI', { align: 'center' });
         doc.moveDown(0.5).fontSize(16).text('QATNASHISH UCHUN ARIZA', { align: 'center' });
         doc.moveDown(1.5);
         doc.fontSize(12).text(`Jamoa nomi: ${team.teamName}`, { underline: true });
@@ -214,7 +240,7 @@ async function generateApplicationPDF(team) {
             doc.text(getEmployeeDepartment(empId) || '—', 350, currentY+5, { width: 90 });
             doc.text('__________', 450, currentY+5);
             currentY += 25;
-            if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta chizish kerak, soddalik uchun tashlab ketilgan */ }
+            if (currentY > 700) { doc.addPage(); currentY = 50; }
         }
         doc.moveDown(2);
         doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
@@ -275,9 +301,9 @@ function getMainMenuKeyboard() {
 
 // -------------------- BO'LIMLARNI KO'RSATISH --------------------
 async function showDepartments(chatId, action, teamCreationData, userId) {
-    const departments = getDepartments();
+    const departments = getDepartments(); // qattiq ro'yxat
     if (departments.length === 0) {
-        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Iltimos, admin bilan bog‘laning yoki admin paneli orqali xodimlarni yuklang.");
+        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Iltimos, admin bilan bog‘laning.");
         userSessions.delete(chatId);
         return;
     }
@@ -457,7 +483,7 @@ bot.on('callback_query', async (query) => {
             return bot.answerCallbackQuery(query.id);
         }
         if (data === 'back_to_departments') {
-            if (!session || (session.step !== 'selecting_letter' && session.step !== 'selecting_employee')) {
+            if (!session || session.step !== 'selecting_letter') {
                 await bot.sendMessage(chatId, "Noma'lum holat.");
                 return bot.answerCallbackQuery(query.id);
             }
@@ -624,7 +650,6 @@ bot.on('message', async (msg) => {
     if (session && session.step === 'awaiting_team_name') {
         if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
         session.teamCreationData.teamName = text;
-        // Bo‘limlar mavjudligini tekshirish
         const departments = getDepartments();
         if (departments.length === 0) {
             await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo‘lim mavjud emas. Iltimos, admin xodimlarni yuklaguncha kuting yoki /cancel buyrug‘i bilan bekor qiling.");
