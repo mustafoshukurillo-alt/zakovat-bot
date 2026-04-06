@@ -97,10 +97,9 @@ function formatIndividuals() {
   }).join('\n');
 }
 
-// -------------------- CSV GENERATSIYA (UTF-8 BOM bilan) --------------------
+// -------------------- CSV GENERATSIYA (to'g'ri formatda) --------------------
 function generateTeamsCSV() {
-  // BOM qo'shamiz (Excel uchun)
-  let csv = "\uFEFFJamoa nomi,Sardor,A'zolar (5 kishi)\n";
+  let csv = "Jamoa nomi,Sardor,A'zolar (5 kishi)\n";
   if (db.teams.length > 0) {
     csv += db.teams.map(team => {
       const captainName = getEmployeeName(team.captainId);
@@ -112,7 +111,7 @@ function generateTeamsCSV() {
 }
 
 function generateIndividualsCSV() {
-  let csv = "\uFEFFXodim ismi,Bo'lim\n";
+  let csv = "Xodim ismi,Bo'lim\n";
   if (db.individuals.length > 0) {
     csv += db.individuals.map(ind => {
       const emp = employees.employees.find(e => e.id === ind.employeeId);
@@ -184,8 +183,8 @@ async function generateApplicationPDF(team) {
     doc.font('Helvetica-Bold');
     doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, { align: 'right' });
     doc.moveDown(0.5);
-    doc.text('Sardor imzosi: ____________________', { align: 'right' });
-    doc.text('Tashkilot muhri: ____________________', { align: 'right' });
+    doc.text('Sardor imzosi: _______________', { align: 'right' });
+   
     
     doc.end();
   });
@@ -193,8 +192,8 @@ async function generateApplicationPDF(team) {
 
 // -------------------- XODIMLARNI CSV DAN YUKLASH --------------------
 async function updateEmployeesFromCSV(fileBuffer) {
-  // UTF-8 BOM ni olib tashlash
   let content = fileBuffer.toString('utf8');
+  // BOM ni olib tashlash
   if (content.charCodeAt(0) === 0xFEFF) {
     content = content.slice(1);
   }
@@ -238,7 +237,6 @@ async function updateEmployeesFromCSV(fileBuffer) {
     }
   }
   
-  // Jamoalar ichidagi ID larni yangilash
   for (const team of db.teams) {
     if (oldToNewId.has(team.captainId)) {
       team.captainId = oldToNewId.get(team.captainId);
@@ -246,7 +244,6 @@ async function updateEmployeesFromCSV(fileBuffer) {
     team.members = team.members.map(mid => oldToNewId.has(mid) ? oldToNewId.get(mid) : mid);
   }
   
-  // Yakkalar ichidagi ID larni yangilash
   for (const ind of db.individuals) {
     if (oldToNewId.has(ind.employeeId)) {
       ind.employeeId = oldToNewId.get(ind.employeeId);
@@ -323,7 +320,7 @@ async function finalizeTeam(chatId, userId, teamData) {
   
   const pdfBuffer = await generateApplicationPDF(newTeam);
   await bot.sendDocument(chatId, pdfBuffer, {
-    filename: `Zakovat_Ariza_${teamName.replace(/[^a-zA-Z0-9_]/g, '_')}.pdf`,
+    filename: `ariya_${Date.now()}.pdf`,
     contentType: 'application/pdf',
     caption: `✅ "${teamName}" jamoasi ro‘yxatdan o‘tdi!`
   });
@@ -335,7 +332,7 @@ async function finalizeTeam(chatId, userId, teamData) {
 
 // -------------------- BOT HANDLERLARI --------------------
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "Assalomu alaykum! Zakovat o'yiniga xush kelibsiz.", getMainMenuKeyboard());
+  bot.sendMessage(msg.chat.id, "Assalomu alaykum! Zakovat o'yinida ro'yxatdan o'tishga xush kelibsiz.", getMainMenuKeyboard());
 });
 
 bot.onText(/\/admin/, async (msg) => {
@@ -398,16 +395,17 @@ bot.on('callback_query', async (callbackQuery) => {
       
       if (data === 'admin_export_teams') {
         try {
-          await bot.sendMessage(chatId, "⏳ CSV tayyorlanmoqda...");
+          await bot.sendMessage(chatId, "⏳ CSV tayyor...");
           const csv = generateTeamsCSV();
-          const buffer = Buffer.from(csv, 'utf8');
-          if (buffer.length > 45 * 1024 * 1024) {
-            await bot.sendMessage(chatId, "⚠️ Fayl juda katta (45MB+). Ma'lumotlarni qisqartiring.");
-          } else {
-            await bot.sendDocument(chatId, buffer, { filename: 'jamoalar.csv', contentType: 'text/csv' });
-            await bot.sendMessage(chatId, `✅ ${db.teams.length} ta jamoa eksport qilindi.`);
-          }
+          // To'g'ri buffer yaratish
+          const buffer = Buffer.from(csv, 'utf-8');
+          await bot.sendDocument(chatId, buffer, { 
+            filename: 'jamoalar.csv', 
+            contentType: 'text/csv; charset=utf-8' 
+          });
+          await bot.sendMessage(chatId, `✅ ${db.teams.length} ta jamoa eksport qilindi.`);
         } catch (err) {
+          console.error('CSV xatosi:', err);
           await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
         }
         return bot.answerCallbackQuery(callbackQuery.id);
@@ -416,7 +414,11 @@ bot.on('callback_query', async (callbackQuery) => {
       if (data === 'admin_export_individuals') {
         try {
           const csv = generateIndividualsCSV();
-          await bot.sendDocument(chatId, Buffer.from(csv, 'utf8'), { filename: 'yakkalar.csv', contentType: 'text/csv' });
+          const buffer = Buffer.from(csv, 'utf-8');
+          await bot.sendDocument(chatId, buffer, { 
+            filename: 'yakkalar.csv', 
+            contentType: 'text/csv; charset=utf-8' 
+          });
           await bot.sendMessage(chatId, `✅ ${db.individuals.length} ta yakka eksport qilindi.`);
         } catch (err) {
           await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
@@ -427,7 +429,11 @@ bot.on('callback_query', async (callbackQuery) => {
       if (data === 'admin_export_json') {
         try {
           const jsonData = JSON.stringify(db.teams, null, 2);
-          await bot.sendDocument(chatId, Buffer.from(jsonData, 'utf8'), { filename: 'jamoalar.json', contentType: 'application/json' });
+          const buffer = Buffer.from(jsonData, 'utf-8');
+          await bot.sendDocument(chatId, buffer, { 
+            filename: 'jamoalar.json', 
+            contentType: 'application/json' 
+          });
           await bot.sendMessage(chatId, "✅ JSON yuklab olindi.");
         } catch (err) {
           await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
@@ -650,8 +656,9 @@ bot.on('message', async (msg) => {
     try {
       const pdfBuffer = await generateApplicationPDF(userTeam);
       await bot.sendDocument(chatId, pdfBuffer, {
-        filename: `Zakovat_Ariza_${userTeam.teamName.replace(/[^a-zA-Z0-9_]/g, '_')}.pdf`,
-        contentType: 'application/pdf'
+        filename: `ariya_${userTeam.teamId}.pdf`,
+        contentType: 'application/pdf',
+        caption: `📄 "${userTeam.teamName}" jamoasi arizasi`
       });
     } catch (err) {
       await bot.sendMessage(chatId, `❌ PDF xatolik: ${err.message}`);
