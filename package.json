@@ -1,7 +1,7 @@
 {
   "name": "zakovat-bot",
-  "version": "2.0.0",
-  "description": "Zakovat o‘yini uchun Telegram bot (ariza PDF bilan)",
+  "version": "3.0.0",
+  "description": "Zakovat o‘yini uchun Telegram bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
