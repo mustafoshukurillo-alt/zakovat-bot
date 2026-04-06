@@ -3,6 +3,8 @@
     { "id": 1, "name": "Alijon Valiyev", "position": "Muhandis", "department": "Mexanika" },
     { "id": 2, "name": "Bahrom Karimov", "position": "Texnik", "department": "Mexanika" },
     { "id": 3, "name": "Dilshod Rahimov", "position": "Elektr xavfsizligi", "department": "Elektr" },
-    { "id": 4, "name": "Feruza To‘rayeva", "position": "Dasturchi", "department": "IT" }
+    { "id": 4, "name": "Feruza To‘rayeva", "position": "Dasturchi", "department": "IT" },
+    { "id": 5, "name": "Gulnora Akbarova", "position": "Montajchi", "department": "Montaj" },
+    { "id": 6, "name": "Hasan Aliyev", "position": "Mexanik", "department": "Mexanika" }
   ]
 }
