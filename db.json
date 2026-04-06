@@ -1,0 +1,11 @@
+{
+  "employees": [
+    { "id": 1, "name": "Ali Valiyev", "department": "Svarka" },
+    { "id": 2, "name": "Vali Aliyev", "department": "Sborka" }
+  ],
+  "teams": [],
+  "individuals": [],
+  "settings": {
+    "registrationOpen": true
+  }
+}
