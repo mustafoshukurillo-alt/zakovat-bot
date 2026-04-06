@@ -49,11 +49,7 @@
     { "id": 47, "name": "Akramov Firdavs Mashrab o'g'li", "position": "Rejalashtirish muhandisi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 48, "name": "Aliakbarov Dilshodjon Firuz ug‘li", "position": "Muhandis-operator", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 49, "name": "Aliyev Mansur Shamsidinovich", "position": "Mutaxassis", "department": "Moddiy ta'minot departamenti" },
-    { "id": 50, "name": "Alikulov Baxtiyor Ikromjon o’g’li", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 50, "name": "Alikulov Baxtiyor Ikromjon o’g’li", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" },
     { "id": 51, "name": "Alikulov Jaxongir Faxriddinovich", "position": "Yig'uvchi", "department": "Yuk avtomobillari kuzovlarini yig'ish sexi" },
     { "id": 52, "name": "Alimov Sardorxon Babirovich", "position": "Omborchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 53, "name": "Amirkulov Zamir Isroil o'g'li", "position": "Yuk ko'taruvchi haydovchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
@@ -103,11 +99,7 @@
     { "id": 97, "name": "Bektashov Samandar Bektosh o'g'li", "position": "Metall chiqindilarni saralovchi-yig'uvchi", "department": "Ma'muriy masalalar departamenti" },
     { "id": 98, "name": "Bektemirov Foziljon Husanovich", "position": "Yig'uvchi", "department": "Plastmass detallar ishlab chiqarish sexi" },
     { "id": 99, "name": "Benderskiy Yan Stanislavovich", "position": "Qo'riqchi", "department": "Xavfsizlik bo'limi" },
-    { "id": 100, "name": "Berdiyev Abror Nurjon o'g'li", "position": "Muhandis-operator", "department": "Payvandlash sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 100, "name": "Berdiyev Abror Nurjon o'g'li", "position": "Muhandis-operator", "department": "Payvandlash sexi" },
     { "id": 101, "name": "Berdiyev Odiljon Obidullo o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
     { "id": 102, "name": "Berdiev Ozodjon Zafar O'g'li", "position": "Рабочий на внутрискладской переработке грузов", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 103, "name": "Berdiyev Otabek Islomovich", "position": "Qo'riqchi", "department": "Xavfsizlik bo'limi" },
@@ -157,11 +149,7 @@
     { "id": 147, "name": "Yoqubaliyev Axmadjon Ziyodulla o’g’li", "position": "Mutaxassis", "department": "Savdo va sotishdan keyingi xizmat departamenti" },
     { "id": 148, "name": "Yoriqulov Jamshid Ismoil o'g'li", "position": "Bo'yoqchi", "department": "Avtobuslar yig'ish sexi" },
     { "id": 149, "name": "Yorqulov Eldor Ismoil o'g'li", "position": "Yig'uvchi", "department": "Yuk avtomobillari kuzovlarini yig'ish sexi" },
-    { "id": 150, "name": "Jabborov Ma’murjon Mardonovich", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Kuzovlar ishlab chiqarish sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 150, "name": "Jabborov Ma’murjon Mardonovich", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Kuzovlar ishlab chiqarish sexi" },
     { "id": 151, "name": "Jalolov Akmaljon G‘ofurovich", "position": "Bo'yoqchi", "department": "Bo'yash sexi" },
     { "id": 152, "name": "Jalolov Ravshan Tuychi o'g'li", "position": "Yig'uvchi", "department": "Avtobuslar yig'ish sexi" },
     { "id": 153, "name": "Jamshedov Shavkat Shuxratovich", "position": "Qo'riqchi", "department": "Xavfsizlik bo'limi" },
@@ -211,11 +199,7 @@
     { "id": 197, "name": "Istamov Soxib Siddiqzoda", "position": "Инженер по нормированию материально-технических ресурсов", "department": "Texnologik ta'minot departamenti" },
     { "id": 198, "name": "Ishonkulov Sherbek Murodilloyevich ", "position": "Rahbar yordamchisi", "department": "Rahbarlar yordamchilari" },
     { "id": 199, "name": "Ishtursunov Ahror Furqat o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
-    { "id": 200, "name": "Yo‘ldashev Javlonbek Zokir o'g'li", "position": "Muhandis-konstruktor", "department": "Konstruktorlik ishlanmalar departamenti" }
-  ]
-}
-{
-  "employees": [
+    { "id": 200, "name": "Yo‘ldashev Javlonbek Zokir o'g'li", "position": "Muhandis-konstruktor", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 201, "name": "Yo‘ldoshev Xusan Saydillayevich", "position": "Sex boshlig'i", "department": "Tayyorlov sexi" },
     { "id": 202, "name": "Kabilov Jasur Nematjonovich", "position": "Bo'lim boshlig'i", "department": "Ishlab chiqarish jarayonlarini optimallashtirish bo'limi" },
     { "id": 203, "name": "Kadirov Muhriddin Sherzodovich", "position": "Uskunalarni ta'mirlash bo'yicha elektrik", "department": "Muhandislik ta'minoti departamenti" },
@@ -265,11 +249,7 @@
     { "id": 247, "name": "Lutfullayev Rifat Amin o'gli", "position": "Omborchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 248, "name": "Mavlonqulov Damirjon Otamurod o'g'li", "position": "Tokar", "department": "Tayyorlov sexi" },
     { "id": 249, "name": "Mavlonov Dilshod Xasanovich", "position": "Bo'yoqchi", "department": "Bo'yash sexi" },
-    { "id": 250, "name": "Madiyarov Azizbek Ilxom o'l'i", "position": "И.о начальника отдела ", "department": "Konstruktorlik ishlanmalar departamenti" }
-  ]
-}
-{
-  "employees": [
+    { "id": 250, "name": "Madiyarov Azizbek Ilxom o'l'i", "position": "И.о начальника отдела ", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 251, "name": "Madiyarov Amir Ilxom o'g'li", "position": "Vakolatxona direktori", "department": "Qozog'iston Respublikasidagi vakolatxona" },
     { "id": 252, "name": "Malikov Ziyodulla Abdimannon o'g'li", "position": "Bo'yoqchi", "department": "Avtobuslar yig'ish sexi" },
     { "id": 253, "name": "Mamanov Alibek Isomiddin o’g’li", "position": "Dasturiy boshqaruvli stanok operatori", "department": "Tayyorlov sexi" },
@@ -319,11 +299,7 @@
     { "id": 297, "name": "Murtazayev Farrux Axmedovich", "position": "Muhandis-konstruktor", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 298, "name": "Musoqulov Giyosiddin Gulom o'g'li", "position": "Yig'uvchi", "department": "Yuk avtomobillari kuzovlarini yig'ish sexi" },
     { "id": 299, "name": "Musoqulov G‘olib G‘ulom o'g'li", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" },
-    { "id": 300, "name": "Mustafoyev Bobur Baxshilloyevich", "position": "Loyihalar muhandisi", "department": "Konstruktorlik ishlanmalar departamenti" }
-  ]
-}
-{
-  "employees": [
+    { "id": 300, "name": "Mustafoyev Bobur Baxshilloyevich", "position": "Loyihalar muhandisi", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 301, "name": "Mustafoev Doston Zafar o'g'li", "position": "Omborchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 302, "name": "Mustafoyev Ramzjon Nazirjonovich", "position": "Rejalashtirish muhandisi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 303, "name": "Mustofoev Baxtiyor Islomovich", "position": "Omborchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
@@ -371,11 +347,7 @@
     { "id": 347, "name": "Olmosov Bobirjon Sherqul o'g'li", "position": "Yig'uvchi", "department": "Yuk avtomobillari kuzovlarini yig'ish sexi" },
     { "id": 348, "name": "Olmosov Maxmudxon Musaxon o'g'li", "position": "Bo'yoqchi", "department": "Bo'yash sexi" },
     { "id": 349, "name": "Orzikulov Tolmasjon Xamrayevich", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Kuzovlar ishlab chiqarish sexi" },
-    { "id": 350, "name": "Ortiqov Jamol Zamoniddin o'g'li", "position": "Konstruksiyalarni yig'uvchi-yelimlovchi", "department": "Plastmass detallar ishlab chiqarish sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 350, "name": "Ortiqov Jamol Zamoniddin o'g'li", "position": "Konstruksiyalarni yig'uvchi-yelimlovchi", "department": "Plastmass detallar ishlab chiqarish sexi" },
     { "id": 351, "name": "Ortikov Xusanboy Azamatbek o'g'li", "position": "Mutaxassis", "department": "Savdo va sotishdan keyingi xizmat departamenti" },
     { "id": 352, "name": "Otamurodov Voxidjon Toirjonovich", "position": "Texnik hujjatlar muhandisi", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 353, "name": "Ochilov G‘Iyosjon Otaqul o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
@@ -425,11 +397,7 @@
     { "id": 397, "name": "Rustamov Xudoyberdi Toxir o'g'li", "position": "Omborchi", "department": "Ishlab chiqarishni rejalashtirish departamenti" },
     { "id": 398, "name": "Sabirov Eskander Grigorevich", "position": "Qo'riqchi", "department": "Xavfsizlik bo'limi" },
     { "id": 399, "name": "Sadinov Anvar Baxodirovich", "position": "Dasturiy boshqaruvli stanok operatori", "department": "Tayyorlov sexi" },
-    { "id": 400, "name": "Saidaxmatov Ibrohim Sharofiddin o'g'li", "position": "Sifat muhandisi", "department": "Sifat nazorati departamenti" }
-  ]
-}
-{
-  "employees": [
+    { "id": 400, "name": "Saidaxmatov Ibrohim Sharofiddin o'g'li", "position": "Sifat muhandisi", "department": "Sifat nazorati departamenti" },
     { "id": 401, "name": "Saidaxmatov Iskandar Sharofiddin o'g'li", "position": "Yig'uvchi", "department": "Elektr jabduqlar ishlab chiqarish sexi" },
     { "id": 402, "name": "Saidov Marlen Akmaljonovich", "position": "Tanlov mutaxassisi", "department": "Xodimlarni boshqarish (HR) departamenti" },
     { "id": 403, "name": "Sa?dova Az?za Bat?rovna", "position": "Marketolog", "department": "Marketing departamenti" },
@@ -479,11 +447,7 @@
     { "id": 447, "name": "Tojiboyev Olimjon Sodiq o'g'li", "position": "Yig'uvchi", "department": "Avtobuslar yig'ish sexi" },
     { "id": 448, "name": "Tojiyev Jaxongir Faxriddin o'g'li", "position": "Bo'lim boshlig'i", "department": "Konstruktorlik ishlanmalar departamenti" },
     { "id": 449, "name": "Tojiyev Elbek Yo’ldosh o’g’li", "position": "Dasturiy boshqaruvli stanok operatori", "department": "Tayyorlov sexi" },
-    { "id": 450, "name": "Tolibov Og'abek Tolibovich", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 450, "name": "Tolibov Og'abek Tolibovich", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" },
     { "id": 451, "name": "Tolibov Otabek Ulug‘bek o'g'li", "position": "Mutaxassis", "department": "Moddiy ta'minot departamenti" },
     { "id": 452, "name": "Tolmasov Feruz Farxod o'g'li", "position": "Qo'riqchi", "department": "Xavfsizlik bo'limi" },
     { "id": 453, "name": "Toshev Mamayusuf Uktam o'g'li", "position": "Kompressor qurilmalari mashinisti", "department": "Muhandislik ta'minoti departamenti" },
@@ -533,11 +497,7 @@
     { "id": 497, "name": "Usmanov Azimjon Iskandar o'g'li", "position": "Sovuq metall kesuvchi", "department": "Tayyorlov sexi" },
     { "id": 498, "name": "Usmonov Dilshod Nuritdin o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
     { "id": 499, "name": "O‘tayev Shoxruh Erkin o'g'li", "position": "Avtomobillar holatini nazorat qilish mexaniki", "department": "Sifat nazorati departamenti" },
-    { "id": 500, "name": "Uchqunov Nazarbek Uchqunovich", "position": "Chilangar-ta'mirchi", "department": "Muhandislik ta'minoti departamenti" }
-  ]
-}
-{
-  "employees": [
+    { "id": 500, "name": "Uchqunov Nazarbek Uchqunovich", "position": "Chilangar-ta'mirchi", "department": "Muhandislik ta'minoti departamenti" },
     { "id": 501, "name": "Fayzullayev Sunnatillo Iskandarovich", "position": "Yig'uvchi", "department": "Avtobuslar yig'ish sexi" },
     { "id": 502, "name": "Farmonov Sultonjon Botir o'g'li", "position": "Yig'uvchi", "department": "Yuk avtomobillari kuzovlarini yig'ish sexi" },
     { "id": 503, "name": "Fozilov Azizbek Mamaraxim o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
@@ -587,11 +547,7 @@
     { "id": 547, "name": "Xujanazarov Nodirbek Sunnat o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
     { "id": 548, "name": "Xo‘janazarov Eldor Uyg‘unovich", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Kuzovlar ishlab chiqarish sexi" },
     { "id": 549, "name": "Xo‘rozov Doston To‘lqinovich", "position": "Yig'uvchi", "department": "Shassi va kabinalarni yig'ish sexi" },
-    { "id": 550, "name": "Xurramov Javlonbek Sobirjonovich", "position": "Yig'uvchi", "department": "Elektr jabduqlar ishlab chiqarish sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 550, "name": "Xurramov Javlonbek Sobirjonovich", "position": "Yig'uvchi", "department": "Elektr jabduqlar ishlab chiqarish sexi" },
     { "id": 551, "name": "Xurramov Munis G‘afur o'g'li", "position": "Avtomatik va yarim avtomatik mashinalarda elektrog payvandchi", "department": "Payvandlash sexi" },
     { "id": 552, "name": "Xurramov Muxammadjon Nazirjon o'g'li", "position": "Yig'uvchi", "department": "Elektr jabduqlar ishlab chiqarish sexi" },
     { "id": 553, "name": "Xusanbayeva Nargiza Shavkatovna", "position": "Ombor mudiri", "department": "Ma'muriy masalalar departamenti" },
@@ -641,11 +597,7 @@
     { "id": 597, "name": "Ergashev Suxrob Zokir o'g'li", "position": "Muhandis-texnolog", "department": "Elektr jabduqlar ishlab chiqarish sexi" },
     { "id": 598, "name": "Ergashov Farruxjon Furkat og‘li", "position": "Smena boshlig'i", "department": "Xavfsizlik bo'limi" },
     { "id": 599, "name": "Ergashova Nodirabegim Muxamedkulovna", "position": "Bo'lim boshlig'i", "department": "Xodimlarni boshqarish (HR) departamenti" },
-    { "id": 600, "name": "Erkinov Aziz Aminjonovich", "position": "Frezerchi", "department": "Tayyorlov sexi" }
-  ]
-}
-{
-  "employees": [
+    { "id": 600, "name": "Erkinov Aziz Aminjonovich", "position": "Frezerchi", "department": "Tayyorlov sexi" },
     { "id": 601, "name": "Erkinov Rustam Alisher O'g'li", "position": "Muhandis-konstruktor", "department": "Istiqbol ishlanmalar departamenti" },
     { "id": 602, "name": "Erkinov Hoji Ikrom o'g'li", "position": "Muhandis-konstruktor", "department": "Istiqbol ishlanmalar departamenti" },
     { "id": 603, "name": "Ermamatov Sherzod Sobir o'g'li", "position": "Контролер сварочных работ", "department": "Sifat nazorati departamenti" },
