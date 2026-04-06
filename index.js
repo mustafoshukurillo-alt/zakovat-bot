@@ -32,15 +32,37 @@ async function loadData() {
     } catch {
         db = { teams: [], individuals: [], registrationOpen: true };
         await saveDB();
+        console.log('🆕 db.json yaratildi');
     }
     try {
         const empRaw = await fs.readFile(EMPLOYEES_PATH, 'utf8');
         employees = JSON.parse(empRaw);
         if (!employees.employees) employees.employees = [];
         console.log('✅ employees.json yuklandi, xodimlar soni:', employees.employees.length);
+        // Agar xodimlar bo'lmasa, namunaviy xodimlarni yaratamiz (test uchun)
+        if (employees.employees.length === 0) {
+            console.log('⚠️ Xodimlar bazasi bo‘sh, namunaviy ma’lumotlar yaratilmoqda...');
+            employees.employees = [
+                { id: 1, name: "Alijon Valiyev", position: "Muhandis", department: "Mexanika" },
+                { id: 2, name: "Bahrom Karimov", position: "Texnik", department: "Mexanika" },
+                { id: 3, name: "Dilshod Rahimov", position: "Elektr xavfsizligi", department: "Elektr" },
+                { id: 4, name: "Feruza To'rayeva", position: "Dasturchi", department: "IT" },
+                { id: 5, name: "Gulnora Akbarova", position: "Montajchi", department: "Montaj" }
+            ];
+            await saveEmployees();
+        }
     } catch (err) {
         console.error('employees.json yuklashda xatolik:', err.message);
-        employees = { employees: [] };
+        // Namunaviy xodimlarni yaratamiz
+        employees = {
+            employees: [
+                { id: 1, name: "Alijon Valiyev", position: "Muhandis", department: "Mexanika" },
+                { id: 2, name: "Bahrom Karimov", position: "Texnik", department: "Mexanika" },
+                { id: 3, name: "Dilshod Rahimov", position: "Elektr xavfsizligi", department: "Elektr" },
+                { id: 4, name: "Feruza To'rayeva", position: "Dasturchi", department: "IT" },
+                { id: 5, name: "Gulnora Akbarova", position: "Montajchi", department: "Montaj" }
+            ]
+        };
         await saveEmployees();
     }
 }
@@ -250,8 +272,9 @@ function getMainMenuKeyboard() {
 // -------------------- BO'LIMLARNI KO'RSATISH --------------------
 async function showDepartments(chatId, action, teamCreationData, userId) {
     const departments = getDepartments();
+    console.log(`showDepartments: ${departments.length} ta bo'lim topildi`);
     if (departments.length === 0) {
-        await bot.sendMessage(chatId, "❌ Hech qanday bo'lim mavjud emas. Admin xodimlarni yuklashi kerak.");
+        await bot.sendMessage(chatId, "❌ Hech qanday bo'lim mavjud emas.\n\nSabablari:\n1. employees.json fayli mavjud emas yoki bo'sh\n2. Xodimlarda 'department' maydoni to'ldirilmagan\n\nIltimos, admin panelidan 📂 Xodimlarni CSV dan yuklash tugmasi orqali xodimlarni yuklang.\n\nNamuna CSV formati:\nid,Ism,Lavozim,Bo'lim\n1,Alijon Valiyev,Muhandis,Mexanika");
         userSessions.delete(chatId);
         return;
     }
@@ -401,7 +424,7 @@ bot.on('callback_query', async (query) => {
             }
             if (data === 'admin_upload_employees') {
                 userSessions.set(chatId, { step: 'awaiting_csv' });
-                await bot.sendMessage(chatId, "📂 CSV faylni yuboring (format: id,Ism,Lavozim,Bo'lim)");
+                await bot.sendMessage(chatId, "📂 CSV faylni yuboring (format: id,Ism,Lavozim,Bo'lim)\n\nNamuna:\n1,Alijon Valiyev,Muhandis,Mexanika\n2,Bahrom Karimov,Texnik,Mexanika");
                 return bot.answerCallbackQuery(query.id);
             }
         }
@@ -566,7 +589,7 @@ bot.on('message', async (msg) => {
         session.teamCreationData.teamName = text;
         const departments = getDepartments();
         if (departments.length === 0) {
-            await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo'lim mavjud emas. Admin xodimlarni yuklaguncha kuting.");
+            await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo'lim mavjud emas.\n\nAdmin panelidan 📂 Xodimlarni CSV dan yuklash tugmasi orqali xodimlarni yuklang.\n\nNamuna CSV:\nid,Ism,Lavozim,Bo'lim\n1,Alijon Valiyev,Muhandis,Mexanika");
             userSessions.delete(chatId);
             return;
         }
