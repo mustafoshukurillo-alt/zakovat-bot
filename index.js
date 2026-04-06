@@ -588,6 +588,36 @@ bot.on('message', async (msg) => {
     }
 });
 
+// Bo'limlarni qidirish funksiyasi (askDepartment o‘rniga)
+async function askDepartmentSearch(chatId, action) {
+    userSessions.set(chatId, {
+        step: 'awaiting_department_search',
+        action: action,
+        teamCreationData: userSessions.get(chatId)?.teamCreationData || { members: [] }
+    });
+    await bot.sendMessage(chatId, "🔍 Bo‘lim nomining kamida 3 harfini kiriting (masalan: 'Plastmass' yoki 'sex'):");
+}
+
+async function searchDepartments(chatId, session, query) {
+    if (query.length < 3) {
+        await bot.sendMessage(chatId, "❌ Kamida 3 harf kiriting.");
+        return;
+    }
+    const departments = getDepartments();
+    const lowerQuery = query.toLowerCase();
+    const results = departments.filter(dept => dept.toLowerCase().includes(lowerQuery));
+    if (results.length === 0) {
+        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim topilmadi. Qaytadan kiriting yoki /cancel.");
+        return;
+    }
+    // Har bir qatorda bitta tugma (inline keyboard)
+    const buttons = results.map(dept => ([{ text: dept, callback_data: `dept_${session.action}_${dept}` }]));
+    buttons.push([{ text: "🔄 Qayta qidirish", callback_data: "search_dept_again" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
+    await bot.sendMessage(chatId, `🔎 "${query}" bo‘yicha ${results.length} ta bo‘lim topildi:`, {
+        reply_markup: { inline_keyboard: buttons }
+    });
+}
+
 // -------------------- SERVER --------------------
 const app = express();
 app.get('/', (req, res) => res.send('Zakovat bot ishlayapti'));
