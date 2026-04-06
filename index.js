@@ -23,43 +23,6 @@ let db = { teams: [], individuals: [], registrationOpen: true };
 let employees = { employees: [] };
 const userSessions = new Map();
 
-// -------------------- BO'LIMLARNI QATTIQ BELGILANG (xodimlardan mustaqil) --------------------
-const DEPARTMENTS_LIST = [
-    "Asbobsozlik sexi",
-    "Avtobuslar yig'ish sexi",
-    "Axborot-kommunikatsiya texnologiyalari va axborot xavfsizligi bo'limi",
-    "Bo'yash sexi",
-    "Buxgalteriya hisobi departamenti",
-    "Elektr jabduqlar ishlab chiqarish sexi",
-    "ERP-mahsulotni boshqarish bo'limi",
-    "Integratsiya guruhi",
-    "Integratsiyalashgan boshqaruv tizimi bo'limi",
-    "Ishlab chiqarish jarayonlarini optimallashtirish bo'limi",
-    "Ishlab chiqarish-mexanika sexi",
-    "Ishlab chiqarishni rejalashtirish departamenti",
-    "Istiqbol ishlanmalar departamenti",
-    "Konstruktorlik ishlanmalar departamenti",
-    "Kuzovlar ishlab chiqarish sexi",
-    "Ma'muriy masalalar departamenti",
-    "Markaziy zavod laboratoriyasi",
-    "Marketing departamenti",
-    "Mehnat muhofazasi, texnika xavfsizligi va yong'in xavfsizligi bo'limi",
-    "Moddiy ta'minot departamenti",
-    "Moliya-iqtisod departamenti",
-    "Muhandislik ta'minoti departamenti",
-    "Payvandlash sexi",
-    "Plastmass detallar ishlab chiqarish sexi",
-    "Rahbarlar yordamchilari",
-    "Savdo va sotishdan keyingi xizmat departamenti",
-    "Sifat nazorati departamenti",
-    "Shassi va kabinalarni yig'ish sexi",
-    "Tayyorlov sexi",
-    "Texnologik ta'minot departamenti",
-    "Xavfsizlik bo'limi",
-    "Xodimlarni boshqarish (HR) departamenti",
-    "Yuk avtomobillari kuzovlarini yig'ish sexi"
-];
-
 // -------------------- YUKLASH VA SAQLASH --------------------
 async function loadData() {
     try {
@@ -76,13 +39,8 @@ async function loadData() {
         if (!employees.employees) employees.employees = [];
         console.log('✅ employees.json yuklandi, xodimlar soni:', employees.employees.length);
     } catch (err) {
-        console.error('employees.json yuklashda xatolik, namunaviy xodimlar yaratiladi:', err.message);
-        // Namunaviy xodimlar (hech bo'lmaganda test qilish uchun)
-        employees = {
-            employees: [
-                { id: 1, name: "Testov Test", position: "Test", department: "Ishlab chiqarishni rejalashtirish departamenti" }
-            ]
-        };
+        console.error('employees.json yuklashda xatolik:', err.message);
+        employees = { employees: [] };
         await saveEmployees();
     }
 }
@@ -108,8 +66,8 @@ function getEmployeeDepartment(id) {
     return emp ? emp.department : '';
 }
 function getDepartments() {
-    // Qattiq belgilangan bo'limlar ro'yxatini qaytar
-    return DEPARTMENTS_LIST;
+    const deps = new Set(employees.employees.map(e => e.department));
+    return Array.from(deps).sort();
 }
 
 // -------------------- XODIMLARNI HARF GURUHI BO'YICHA OLISH --------------------
@@ -129,8 +87,8 @@ function getEmployeesByLetterGroup(department, group, excludeIds = []) {
     else if (group === 'X-Y') letters = ['X','Y'];
     else letters = ['Z'];
     
-    const deptEmployees = employees.employees.filter(emp => emp.department === department);
-    return deptEmployees.filter(emp =>
+    return employees.employees.filter(emp =>
+        emp.department === department &&
         letters.some(l => emp.name.charAt(0).toUpperCase() === l) &&
         isEmployeeAvailable(emp.id) &&
         !excludeIds.includes(emp.id)
@@ -218,7 +176,7 @@ async function generateApplicationPDF(team) {
         doc.on('data', chunk => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
-        doc.fontSize(18).text('SAMAUTO ZAKOVAT TURNIRI', { align: 'center' });
+        doc.fontSize(18).text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
         doc.moveDown(0.5).fontSize(16).text('QATNASHISH UCHUN ARIZA', { align: 'center' });
         doc.moveDown(1.5);
         doc.fontSize(12).text(`Jamoa nomi: ${team.teamName}`, { underline: true });
@@ -299,14 +257,15 @@ function getMainMenuKeyboard() {
     };
 }
 
-// -------------------- BO'LIMLARNI KO'RSATISH --------------------
+// -------------------- BO'LIMLARNI KO'RSATISH (inline) --------------------
 async function showDepartments(chatId, action, teamCreationData, userId) {
-    const departments = getDepartments(); // qattiq ro'yxat
+    const departments = getDepartments();
     if (departments.length === 0) {
-        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Iltimos, admin bilan bog‘laning.");
+        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Iltimos, admin xodimlarni yuklasin.");
         userSessions.delete(chatId);
         return;
     }
+    // Har bir qatorda 2 ta bo'lim
     const buttons = [];
     for (let i = 0; i < departments.length; i += 2) {
         const row = [];
@@ -388,7 +347,11 @@ async function finalizeTeam(chatId, userId, teamData) {
 }
 
 // -------------------- BOT HANDLERLARI --------------------
-bot.onText(/\/start/, (msg) => bot.sendMessage(msg.chat.id, "Assalomu alaykum! Zakovat o'yiniga xush kelibsiz.", getMainMenuKeyboard()));
+bot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, "Assalomu alaykum! Zakovat o'yiniga xush kelibsiz.", getMainMenuKeyboard());
+});
+
 bot.onText(/\/admin/, async (msg) => {
     const chatId = msg.chat.id;
     if (!ADMIN_IDS.includes(msg.from.id)) return bot.sendMessage(chatId, "⛔ Faqat adminlar.");
@@ -405,6 +368,7 @@ bot.onText(/\/admin/, async (msg) => {
     };
     await bot.sendMessage(chatId, "🔧 Admin paneli:", adminButtons);
 });
+
 bot.onText(/\/cancel/, (msg) => {
     const chatId = msg.chat.id;
     if (userSessions.has(chatId)) userSessions.delete(chatId);
@@ -425,8 +389,14 @@ bot.on('callback_query', async (query) => {
         }
         // Admin
         if (ADMIN_IDS.includes(userId)) {
-            if (data === 'admin_view_teams') return bot.sendMessage(chatId, formatTeamsHTML(), { parse_mode: 'HTML' }) && bot.answerCallbackQuery(query.id);
-            if (data === 'admin_view_individuals') return bot.sendMessage(chatId, formatIndividualsHTML(), { parse_mode: 'HTML' }) && bot.answerCallbackQuery(query.id);
+            if (data === 'admin_view_teams') {
+                await bot.sendMessage(chatId, formatTeamsHTML(), { parse_mode: 'HTML' });
+                return bot.answerCallbackQuery(query.id);
+            }
+            if (data === 'admin_view_individuals') {
+                await bot.sendMessage(chatId, formatIndividualsHTML(), { parse_mode: 'HTML' });
+                return bot.answerCallbackQuery(query.id);
+            }
             if (data === 'admin_export_teams') {
                 await sendFileFromBuffer(chatId, Buffer.from(generateTeamsCSV(), 'utf8'), 'jamoalar.csv', 'text/csv');
                 return bot.answerCallbackQuery(query.id);
@@ -470,10 +440,10 @@ bot.on('callback_query', async (query) => {
                 return bot.answerCallbackQuery(query.id);
             }
         }
-        // ---------- JAMOA YARATISH: BO'LIM TANLASH ----------
+        // ---------- JAMOA YARATISH ----------
         if (data.startsWith('select_dept_')) {
             const parts = data.split('_');
-            const action = parts[2]; // 'captain' yoki 'member'
+            const action = parts[2];
             const department = parts.slice(3).join('_');
             if (!session || session.step !== 'selecting_department' || session.action !== action) {
                 await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
@@ -483,14 +453,13 @@ bot.on('callback_query', async (query) => {
             return bot.answerCallbackQuery(query.id);
         }
         if (data === 'back_to_departments') {
-            if (!session || session.step !== 'selecting_letter') {
+            if (!session || (session.step !== 'selecting_letter' && session.step !== 'selecting_employee')) {
                 await bot.sendMessage(chatId, "Noma'lum holat.");
                 return bot.answerCallbackQuery(query.id);
             }
             await showDepartments(chatId, session.action, session.teamCreationData, session.userId);
             return bot.answerCallbackQuery(query.id);
         }
-        // ---------- HARF GURUHI TANLASH ----------
         if (data.startsWith('letter_')) {
             const parts = data.split('_');
             const action = parts[1];
@@ -511,7 +480,6 @@ bot.on('callback_query', async (query) => {
             await showLetterGroups(chatId, department, action, session.teamCreationData, session.userId, session.excludeIds);
             return bot.answerCallbackQuery(query.id);
         }
-        // ---------- XODIM TANLASH ----------
         if (data.startsWith('select_emp_')) {
             const parts = data.split('_');
             const action = parts[2];
@@ -549,7 +517,6 @@ bot.on('callback_query', async (query) => {
             }
             return bot.answerCallbackQuery(query.id);
         }
-        // Xodim sahifalash
         if (data.startsWith('emp_page_')) {
             const parts = data.split('_');
             const action = parts[2];
@@ -646,13 +613,14 @@ bot.on('message', async (msg) => {
         return sendFileFromBuffer(chatId, pdf, `ariya_${userTeam.teamId}.pdf`, 'application/pdf', `📄 "${userTeam.teamName}" jamoasi arizasi`);
     }
     if (text === "ℹ️ Yordam") return bot.sendMessage(chatId, "📌 **Yordam**\n• Jamoani ro'yxatga olish: 5 a'zo (sardor + 4)\n• Individual ro'yxatga olish: Jamoasi yo'qlarni tizim guruhlarga ajratadi\n• Mening jamoam: PDF ariza yuklash\n• Admin: /admin\n• Bekor qilish: /cancel", { parse_mode: 'Markdown' });
+    
     // Jamoa nomi
     if (session && session.step === 'awaiting_team_name') {
         if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
         session.teamCreationData.teamName = text;
         const departments = getDepartments();
         if (departments.length === 0) {
-            await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo‘lim mavjud emas. Iltimos, admin xodimlarni yuklaguncha kuting yoki /cancel buyrug‘i bilan bekor qiling.");
+            await bot.sendMessage(chatId, "❌ Hozircha hech qanday bo‘lim mavjud emas. Admin xodimlarni yuklaguncha kuting.");
             userSessions.delete(chatId);
             return;
         }
