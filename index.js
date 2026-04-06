@@ -216,7 +216,8 @@ async function updateEmployeesFromCSV(fileBuffer) {
   let newId = 1;
   
   for (let i = startIdx; i < lines.length; i++) {
-    const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+    // 174-qatorni quyidagicha o'zgartiring:
+const parts = lines[i].split(/[;,]/).map(p => p.trim().replace(/^"|"$/g, ''));
     if (parts.length < 4) continue;
     
     const name = parts[1];
@@ -605,18 +606,28 @@ bot.on('message', async (msg) => {
   const userId = msg.from.id;
   const session = userSessions.get(chatId);
 
-  // Admin CSV yuklash
-  if (session && session.step === 'awaiting_csv' && msg.document) {
+ // Admin CSV yuklash
+  if (session && session.step === 'awaiting_csv' && (msg.document || msg.audio)) {
     if (!ADMIN_IDS.includes(userId)) return;
+    
+    const fileId = msg.document ? msg.document.file_id : msg.audio.file_id;
+    
     try {
-      const file = await bot.getFile(msg.document.file_id);
+      await bot.sendMessage(chatId, "⏳ Fayl ishlanmoqda...");
+      const file = await bot.getFile(fileId);
       const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      
       const response = await fetch(url);
-      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!response.ok) throw new Error('Faylni yuklab bo‘lmadi');
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
       const count = await updateEmployeesFromCSV(buffer);
-      await bot.sendMessage(chatId, `✅ ${count} ta xodim yangilandi. Jamoalar va yakkalar saqlanib qoldi.`);
+      await bot.sendMessage(chatId, `✅ Muvaffaqiyatli! ${count} ta xodim bazaga kiritildi.`, getMainMenuKeyboard());
     } catch (err) {
-      await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
+      console.error(err);
+      await bot.sendMessage(chatId, `❌ Xatolik yuz berdi: ${err.message}`);
     }
     userSessions.delete(chatId);
     return;
