@@ -67,22 +67,52 @@ function getEmployeeDepartment(id) {
 }
 function getDepartments() {
     const deps = new Set(employees.employees.map(e => e.department));
-    return Array.from(deps);
+    return Array.from(deps).sort();
 }
 
-// -------------------- QIDIRUV FUNKSIYALARI --------------------
-function searchDepartments(query) {
-    const lowerQuery = query.toLowerCase();
-    return getDepartments().filter(dept => dept.toLowerCase().includes(lowerQuery));
+// -------------------- XODIMLARNI HARF GURUHI BO'YICHA OLISH --------------------
+// Harf guruhlari: A-B, C-D, E-F, G-H, I-J, K-L, M-N, O-P, Q-R, S-T, U-V, X-Y, Z
+function getLetterGroup(letter) {
+    const upper = letter.toUpperCase();
+    if ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.includes(upper)) {
+        if (upper <= 'B') return 'A-B';
+        if (upper <= 'D') return 'C-D';
+        if (upper <= 'F') return 'E-F';
+        if (upper <= 'H') return 'G-H';
+        if (upper <= 'J') return 'I-J';
+        if (upper <= 'L') return 'K-L';
+        if (upper <= 'N') return 'M-N';
+        if (upper <= 'P') return 'O-P';
+        if (upper <= 'R') return 'Q-R';
+        if (upper <= 'T') return 'S-T';
+        if (upper <= 'V') return 'U-V';
+        if (upper <= 'Y') return 'X-Y';
+        return 'Z';
+    }
+    return 'Z';
 }
-function searchEmployeesByDepartment(department, query, excludeIds = []) {
-    const lowerQuery = query.toLowerCase();
+function getEmployeesByLetterGroup(department, group, excludeIds = []) {
+    let letters;
+    if (group === 'A-B') letters = ['A','B'];
+    else if (group === 'C-D') letters = ['C','D'];
+    else if (group === 'E-F') letters = ['E','F'];
+    else if (group === 'G-H') letters = ['G','H'];
+    else if (group === 'I-J') letters = ['I','J'];
+    else if (group === 'K-L') letters = ['K','L'];
+    else if (group === 'M-N') letters = ['M','N'];
+    else if (group === 'O-P') letters = ['O','P'];
+    else if (group === 'Q-R') letters = ['Q','R'];
+    else if (group === 'S-T') letters = ['S','T'];
+    else if (group === 'U-V') letters = ['U','V'];
+    else if (group === 'X-Y') letters = ['X','Y'];
+    else letters = ['Z'];
+    
     return employees.employees.filter(emp =>
         emp.department === department &&
-        emp.name.toLowerCase().includes(lowerQuery) &&
+        letters.some(l => emp.name.charAt(0).toUpperCase() === l) &&
         isEmployeeAvailable(emp.id) &&
         !excludeIds.includes(emp.id)
-    );
+    ).sort((a,b) => a.name.localeCompare(b.name));
 }
 
 // -------------------- FORMATLASH (Admin HTML) --------------------
@@ -188,7 +218,7 @@ async function generateApplicationPDF(team) {
             doc.text(getEmployeeDepartment(empId) || '—', 350, currentY+5, { width: 90 });
             doc.text('__________', 450, currentY+5);
             currentY += 25;
-            if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta chizish kerak, lekin soddalik uchun tashlab ketilgan */ }
+            if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta chizish kerak, soddalik uchun tashlab ketilgan */ }
         }
         doc.moveDown(2);
         doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
@@ -216,7 +246,6 @@ async function updateEmployeesFromCSV(fileBuffer) {
         newEmployees.push({ id: newId++, name, position: position || '', department });
     }
     if (newEmployees.length === 0) throw new Error('Hech qanday xodim topilmadi');
-    // Eski ID larni yangilash (jamoalar va yakkalarni saqlash uchun)
     const oldToNewId = new Map();
     for (let i = 0; i < employees.employees.length && i < newEmployees.length; i++) {
         if (employees.employees[i] && newEmployees[i]) oldToNewId.set(employees.employees[i].id, newEmployees[i].id);
@@ -248,76 +277,73 @@ function getMainMenuKeyboard() {
     };
 }
 
-// -------------------- QIDIRUV BILAN BO'LIM TANLASH (JAMOA YARATISH) --------------------
-async function askDepartmentSearch(chatId, action, context = {}) {
+// -------------------- BO'LIMLARNI KO'RSATISH --------------------
+async function showDepartments(chatId, action, teamCreationData, userId) {
+    const departments = getDepartments();
+    if (departments.length === 0) {
+        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim mavjud emas. Admin xodimlarni yuklamagan.");
+        return;
+    }
+    // Har bir qatorda 2 ta bo'limdan chiqaramiz
+    const buttons = [];
+    for (let i = 0; i < departments.length; i += 2) {
+        const row = [];
+        row.push({ text: departments[i], callback_data: `select_dept_${action}_${departments[i]}` });
+        if (i+1 < departments.length) row.push({ text: departments[i+1], callback_data: `select_dept_${action}_${departments[i+1]}` });
+        buttons.push(row);
+    }
+    buttons.push([{ text: "❌ Bekor qilish", callback_data: "cancel" }]);
+    await bot.sendMessage(chatId, "📌 Iltimos, bo‘limni tanlang:", { reply_markup: { inline_keyboard: buttons } });
     userSessions.set(chatId, {
-        step: 'awaiting_department_search',
+        step: 'selecting_department',
         action: action,
-        teamCreationData: context.teamCreationData || { members: [] },
-        userId: context.userId,
-        excludeIds: context.excludeIds || []
-    });
-    await bot.sendMessage(chatId, "🔍 Bo‘lim nomining kamida 3 harfini kiriting (masalan: 'Avtobu', 'sex', 'departament'):");
-}
-
-async function performDepartmentSearch(chatId, session, query) {
-    if (query.length < 3) {
-        await bot.sendMessage(chatId, "❌ Iltimos, kamida 3 harf kiriting.");
-        return;
-    }
-    const results = searchDepartments(query);
-    if (results.length === 0) {
-        await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim topilmadi. Qaytadan kiriting yoki /cancel.");
-        return;
-    }
-    // Bo‘limlar ro‘yxatini inline keyboardda chiqaramiz (maksimal 50 ta, lekin Telegram limiti 100)
-    const buttons = results.map(dept => ([{ text: dept, callback_data: `select_dept_${session.action}_${dept}` }]));
-    buttons.push([{ text: "🔄 Qayta qidirish", callback_data: "dept_search_again" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
-    await bot.sendMessage(chatId, `🔎 "${query}" bo‘yicha ${results.length} ta bo‘lim topildi:`, {
-        reply_markup: { inline_keyboard: buttons }
+        teamCreationData: teamCreationData,
+        userId: userId,
+        excludeIds: teamCreationData?.members || []
     });
 }
 
-// -------------------- BO'LIM TANLANGAN: XODIM QIDIRISH --------------------
-async function askEmployeeSearch(chatId, session, department) {
-    session.step = 'awaiting_employee_search';
-    session.selectedDepartment = department;
-    await bot.sendMessage(chatId, `🔍 "${department}" bo‘limidagi xodimlarni qidirish uchun ism/familiyaning kamida 3 harfini kiriting (masalan: 'Azim', 'Abdu'):`);
+// -------------------- HARF GURUHLARINI KO'RSATISH --------------------
+async function showLetterGroups(chatId, department, action, teamCreationData, userId, excludeIds) {
+    const groups = ['A-B', 'C-D', 'E-F', 'G-H', 'I-J', 'K-L', 'M-N', 'O-P', 'Q-R', 'S-T', 'U-V', 'X-Y', 'Z'];
+    const buttons = groups.map(g => ([{ text: g, callback_data: `letter_${action}_${department}_${g}` }]));
+    buttons.push([{ text: "⬅️ Bo'limlarga qaytish", callback_data: "back_to_departments" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
+    await bot.sendMessage(chatId, `🔤 "${department}" bo‘limidagi xodimlarni tanlash uchun xodimning familiyasi boshlanadigan harf guruhini tanlang:`, { reply_markup: { inline_keyboard: buttons } });
+    userSessions.set(chatId, {
+        step: 'selecting_letter',
+        action: action,
+        department: department,
+        teamCreationData: teamCreationData,
+        userId: userId,
+        excludeIds: excludeIds
+    });
 }
 
-async function performEmployeeSearch(chatId, session, query, page = 0) {
-    if (query.length < 3) {
-        await bot.sendMessage(chatId, "❌ Iltimos, kamida 3 harf kiriting.");
-        return;
-    }
-    const { selectedDepartment, action, teamCreationData, excludeIds } = session;
-    const results = searchEmployeesByDepartment(selectedDepartment, query, excludeIds);
-    if (results.length === 0) {
-        await bot.sendMessage(chatId, "❌ Bunday ishchi yo‘q yoki 35 yoshdan oshgan yoki boshqa jamoada ro‘yxatdan o‘tgan. Admin bilan bog‘laning.\n🔄 Qaytadan qidirish uchun /cancel va qayta boshlang.");
-        // Session ni tozalaymiz, foydalanuvchi qaytadan boshlashi kerak
-        userSessions.delete(chatId);
+// -------------------- XODIMLARNI SAHIFALAB KO'RSATISH --------------------
+async function showEmployeesByGroup(chatId, department, group, action, teamCreationData, userId, excludeIds, page = 0) {
+    const employeesList = getEmployeesByLetterGroup(department, group, excludeIds);
+    if (employeesList.length === 0) {
+        await bot.sendMessage(chatId, `❌ "${group}" harf guruhida mavjud xodim yo‘q.`);
+        // Qaytadan harf guruhlarini ko'rsatamiz
+        await showLetterGroups(chatId, department, action, teamCreationData, userId, excludeIds);
         return;
     }
     const pageSize = 20;
-    const totalPages = Math.ceil(results.length / pageSize);
+    const totalPages = Math.ceil(employeesList.length / pageSize);
     if (page >= totalPages) page = totalPages - 1;
     if (page < 0) page = 0;
     const start = page * pageSize;
     const end = start + pageSize;
-    const pageResults = results.slice(start, end);
-    const buttons = pageResults.map(emp => ([{ text: emp.name, callback_data: `select_emp_${action}_${emp.id}` }]));
+    const pageEmployees = employeesList.slice(start, end);
+    const buttons = pageEmployees.map(emp => ([{ text: emp.name, callback_data: `select_emp_${action}_${emp.id}` }]));
     if (totalPages > 1) {
-        const navButtons = [];
-        if (page > 0) navButtons.push({ text: "⬅️ Oldingi", callback_data: `emp_page_${page-1}_${query}` });
-        if (page < totalPages-1) navButtons.push({ text: "Keyingi ➡️", callback_data: `emp_page_${page+1}_${query}` });
-        if (navButtons.length) buttons.push(navButtons);
+        const navRow = [];
+        if (page > 0) navRow.push({ text: "⬅️ Oldingi", callback_data: `emp_page_${action}_${department}_${group}_${page-1}` });
+        if (page < totalPages-1) navRow.push({ text: "Keyingi ➡️", callback_data: `emp_page_${action}_${department}_${group}_${page+1}` });
+        if (navRow.length) buttons.push(navRow);
     }
-    buttons.push([{ text: "🔄 Qayta qidirish", callback_data: "emp_search_again" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
-    await bot.sendMessage(chatId, `🔎 "${query}" bo‘yicha ${results.length} ta xodim topildi (${page+1}/${totalPages}):`, {
-        reply_markup: { inline_keyboard: buttons }
-    });
-    session.empSearchQuery = query;
-    session.empSearchPage = page;
+    buttons.push([{ text: "🔄 Boshqa harf guruhi", callback_data: `back_to_letters_${action}_${department}` }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
+    await bot.sendMessage(chatId, `🔎 "${group}" guruhida ${employeesList.length} ta xodim (${page+1}/${totalPages}):`, { reply_markup: { inline_keyboard: buttons } });
 }
 
 // -------------------- JAMOANI YAKUNLASH --------------------
@@ -378,39 +404,26 @@ bot.on('callback_query', async (query) => {
         }
         // Admin
         if (ADMIN_IDS.includes(userId)) {
-            if (data === 'admin_view_teams') {
-                await bot.sendMessage(chatId, formatTeamsHTML(), { parse_mode: 'HTML' });
-                return bot.answerCallbackQuery(query.id);
-            }
-            if (data === 'admin_view_individuals') {
-                await bot.sendMessage(chatId, formatIndividualsHTML(), { parse_mode: 'HTML' });
-                return bot.answerCallbackQuery(query.id);
-            }
+            if (data === 'admin_view_teams') return bot.sendMessage(chatId, formatTeamsHTML(), { parse_mode: 'HTML' }) && bot.answerCallbackQuery(query.id);
+            if (data === 'admin_view_individuals') return bot.sendMessage(chatId, formatIndividualsHTML(), { parse_mode: 'HTML' }) && bot.answerCallbackQuery(query.id);
             if (data === 'admin_export_teams') {
-                const csv = generateTeamsCSV();
-                await sendFileFromBuffer(chatId, Buffer.from(csv, 'utf8'), 'jamoalar.csv', 'text/csv; charset=utf-8');
+                await sendFileFromBuffer(chatId, Buffer.from(generateTeamsCSV(), 'utf8'), 'jamoalar.csv', 'text/csv');
                 return bot.answerCallbackQuery(query.id);
             }
             if (data === 'admin_export_individuals') {
-                const csv = generateIndividualsCSV();
-                await sendFileFromBuffer(chatId, Buffer.from(csv, 'utf8'), 'yakkalar.csv', 'text/csv; charset=utf-8');
+                await sendFileFromBuffer(chatId, Buffer.from(generateIndividualsCSV(), 'utf8'), 'yakkalar.csv', 'text/csv');
                 return bot.answerCallbackQuery(query.id);
             }
             if (data === 'admin_export_applications') {
-                const csv = generateAllApplicationsCSV();
-                await sendFileFromBuffer(chatId, Buffer.from(csv, 'utf8'), 'barcha_arizalar.csv', 'text/csv; charset=utf-8');
+                await sendFileFromBuffer(chatId, Buffer.from(generateAllApplicationsCSV(), 'utf8'), 'barcha_arizalar.csv', 'text/csv');
                 return bot.answerCallbackQuery(query.id);
             }
             if (data === 'admin_export_json') {
-                const json = JSON.stringify(db.teams, null, 2);
-                await sendFileFromBuffer(chatId, Buffer.from(json, 'utf8'), 'jamoalar.json', 'application/json');
+                await sendFileFromBuffer(chatId, Buffer.from(JSON.stringify(db.teams, null, 2), 'utf8'), 'jamoalar.json', 'application/json');
                 return bot.answerCallbackQuery(query.id);
             }
             if (data === 'admin_random_teams') {
-                if (db.individuals.length < 5) {
-                    await bot.sendMessage(chatId, "❌ Kamida 5 yakka kerak.");
-                    return bot.answerCallbackQuery(query.id);
-                }
+                if (db.individuals.length < 5) return bot.sendMessage(chatId, "❌ Kamida 5 yakka kerak.") && bot.answerCallbackQuery(query.id);
                 const shuffled = [...db.individuals].sort(() => Math.random() - 0.5);
                 const newTeams = []; const used = new Set();
                 for (let i = 0; i+5 <= shuffled.length; i+=5) {
@@ -432,35 +445,57 @@ bot.on('callback_query', async (query) => {
             }
             if (data === 'admin_upload_employees') {
                 userSessions.set(chatId, { step: 'awaiting_csv' });
-                await bot.sendMessage(chatId, "📂 CSV faylni yuboring (format: id,Ism,Lavozim,Bo'lim)\nMisol:\n1,Abdinorov Doniyor,Detallarni qayta ishlash mutaxassisi,Ishlab chiqarishni rejalashtirish departamenti");
+                await bot.sendMessage(chatId, "📂 CSV faylni yuboring (format: id,Ism,Lavozim,Bo'lim)");
                 return bot.answerCallbackQuery(query.id);
             }
         }
-        // ---------- JAMOA YARATISH: BO'LIM QIDIRUV NATIJALARI ----------
+        // ---------- JAMOA YARATISH: BO'LIM TANLASH ----------
         if (data.startsWith('select_dept_')) {
             const parts = data.split('_');
             const action = parts[2]; // 'captain' yoki 'member'
             const department = parts.slice(3).join('_');
-            if (!session || session.step !== 'awaiting_department_search' || session.action !== action) {
+            if (!session || session.step !== 'selecting_department' || session.action !== action) {
                 await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
                 return bot.answerCallbackQuery(query.id);
             }
-            // Bo‘lim tanlandi, endi xodim qidiruviga o‘tamiz
-            await askEmployeeSearch(chatId, session, department);
+            await showLetterGroups(chatId, department, action, session.teamCreationData, session.userId, session.excludeIds);
             return bot.answerCallbackQuery(query.id);
         }
-        // Bo‘lim qidiruvini qayta boshlash
-        if (data === 'dept_search_again') {
-            if (!session || session.step !== 'awaiting_department_search') return bot.answerCallbackQuery(query.id);
-            await bot.sendMessage(chatId, "🔍 Iltimos, bo‘lim nomining kamida 3 harfini kiriting:");
+        if (data === 'back_to_departments') {
+            if (!session || (session.step !== 'selecting_letter' && session.step !== 'selecting_employee')) {
+                await bot.sendMessage(chatId, "Noma'lum holat.");
+                return bot.answerCallbackQuery(query.id);
+            }
+            await showDepartments(chatId, session.action, session.teamCreationData, session.userId);
             return bot.answerCallbackQuery(query.id);
         }
-        // ---------- XODIM QIDIRUV NATIJALARI ----------
+        // ---------- HARF GURUHI TANLASH ----------
+        if (data.startsWith('letter_')) {
+            const parts = data.split('_');
+            const action = parts[1];
+            const department = parts[2];
+            const group = parts[3];
+            if (!session || session.step !== 'selecting_letter') {
+                await bot.sendMessage(chatId, "Vaqt tugadi. Qaytadan boshlang.");
+                return bot.answerCallbackQuery(query.id);
+            }
+            await showEmployeesByGroup(chatId, department, group, action, session.teamCreationData, session.userId, session.excludeIds, 0);
+            return bot.answerCallbackQuery(query.id);
+        }
+        if (data.startsWith('back_to_letters_')) {
+            const parts = data.split('_');
+            const action = parts[3];
+            const department = parts[4];
+            if (!session) return bot.answerCallbackQuery(query.id);
+            await showLetterGroups(chatId, department, action, session.teamCreationData, session.userId, session.excludeIds);
+            return bot.answerCallbackQuery(query.id);
+        }
+        // ---------- XODIM TANLASH ----------
         if (data.startsWith('select_emp_')) {
             const parts = data.split('_');
             const action = parts[2];
             const employeeId = parseInt(parts[3]);
-            if (!session || session.step !== 'awaiting_employee_search' || session.action !== action) {
+            if (!session || session.step !== 'selecting_letter') {
                 await bot.sendMessage(chatId, "Vaqt tugadi. Qaytadan boshlang.");
                 return bot.answerCallbackQuery(query.id);
             }
@@ -472,12 +507,13 @@ bot.on('callback_query', async (query) => {
             if (action === 'captain') {
                 teamData.captainId = employeeId;
                 teamData.members.push(employeeId);
-                session.action = 'member';
-                session.excludeIds = teamData.members;
-                // Endi a'zo qo'shish uchun bo'lim qidiruviga o'tamiz
-                session.step = 'awaiting_department_search';
-                await bot.sendMessage(chatId, "✅ Sardor tanlandi. Endi jamoa a'zolarini qo'shamiz (yana 4 kishi).");
-                await askDepartmentSearch(chatId, 'member', { teamCreationData: teamData, userId: session.userId, excludeIds: teamData.members });
+                // A'zo qo'shishga o'tamiz
+                if (teamData.members.length === 5) {
+                    await finalizeTeam(chatId, session.userId, teamData);
+                } else {
+                    await bot.sendMessage(chatId, `✅ Sardor tanlandi. Endi jamoa a'zolarini qo'shamiz (${teamData.members.length}/5).`);
+                    await showDepartments(chatId, 'member', teamData, session.userId);
+                }
             } else if (action === 'member') {
                 if (teamData.members.includes(employeeId)) {
                     await bot.sendMessage(chatId, "Bu xodim oldin tanlangan.");
@@ -487,55 +523,44 @@ bot.on('callback_query', async (query) => {
                 if (teamData.members.length === 5) {
                     await finalizeTeam(chatId, session.userId, teamData);
                 } else {
-                    session.excludeIds = teamData.members;
-                    session.step = 'awaiting_department_search';
-                    await bot.sendMessage(chatId, `✅ A'zo qo'shildi (${teamData.members.length}/5). Keyingi a'zoni qo'shamiz.`);
-                    await askDepartmentSearch(chatId, 'member', { teamCreationData: teamData, userId: session.userId, excludeIds: teamData.members });
+                    await bot.sendMessage(chatId, `✅ A'zo qo'shildi (${teamData.members.length}/5). Keyingi a'zoni tanlang.`);
+                    await showDepartments(chatId, 'member', teamData, session.userId);
                 }
             }
             return bot.answerCallbackQuery(query.id);
         }
-        // Xodim qidiruvida sahifalash
+        // Xodim sahifalash
         if (data.startsWith('emp_page_')) {
             const parts = data.split('_');
-            const page = parseInt(parts[2]);
-            const query = parts.slice(3).join('_');
-            if (!session || session.step !== 'awaiting_employee_search') {
-                await bot.sendMessage(chatId, "Vaqt tugadi. Qaytadan boshlang.");
-                return bot.answerCallbackQuery(query.id);
-            }
-            await performEmployeeSearch(chatId, session, query, page);
+            const action = parts[2];
+            const department = parts[3];
+            const group = parts[4];
+            const page = parseInt(parts[5]);
+            if (!session || session.step !== 'selecting_letter') return bot.answerCallbackQuery(query.id);
+            await showEmployeesByGroup(chatId, department, group, action, session.teamCreationData, session.userId, session.excludeIds, page);
             return bot.answerCallbackQuery(query.id);
         }
-        if (data === 'emp_search_again') {
-            if (!session || session.step !== 'awaiting_employee_search') return bot.answerCallbackQuery(query.id);
-            await bot.sendMessage(chatId, "🔍 Iltimos, xodim ismining kamida 3 harfini kiriting:");
-            return bot.answerCallbackQuery(query.id);
-        }
-        // ---------- YAKKA RO'YXAT UCHUN QIDIRUV ----------
+        // ---------- YAKKA RO'YXAT ----------
         if (data === 'start_individual') {
             if (!session || session.step !== 'individual') {
                 await bot.sendMessage(chatId, "Iltimos, avval 'Individual ro'yxatga olish' tugmasini bosing.");
                 return bot.answerCallbackQuery(query.id);
             }
-            userSessions.set(chatId, { step: 'individual_dept_search', userId });
-            await bot.sendMessage(chatId, "🔍 O‘zingiz ishlaydigan bo‘lim nomining kamida 3 harfini kiriting (masalan: 'Avtobu', 'sex'):");
+            await showDepartments(chatId, 'individual', null, userId);
             return bot.answerCallbackQuery(query.id);
         }
         if (data.startsWith('select_ind_dept_')) {
             const department = data.split('_').slice(3).join('_');
-            if (!session || session.step !== 'individual_dept_search') {
+            if (!session || session.step !== 'selecting_department' || session.action !== 'individual') {
                 await bot.sendMessage(chatId, "Vaqt tugadi. Qaytadan boshlang.");
                 return bot.answerCallbackQuery(query.id);
             }
-            session.step = 'individual_emp_search';
-            session.selectedDepartment = department;
-            await bot.sendMessage(chatId, `🔍 "${department}" bo‘limida o‘zingizni qidirish uchun ismingizning kamida 3 harfini kiriting:`);
+            await showLetterGroups(chatId, department, 'individual', null, userId, []);
             return bot.answerCallbackQuery(query.id);
         }
         if (data.startsWith('select_ind_emp_')) {
             const employeeId = parseInt(data.split('_')[3]);
-            if (!session || session.step !== 'individual_emp_search') {
+            if (!session || session.step !== 'selecting_letter' || session.action !== 'individual') {
                 await bot.sendMessage(chatId, "Vaqt tugadi. Qaytadan boshlang.");
                 return bot.answerCallbackQuery(query.id);
             }
@@ -548,16 +573,6 @@ bot.on('callback_query', async (query) => {
             await saveDB();
             await bot.sendMessage(chatId, "✅ Siz random usulida jamoa tanlashga qabul qilindingiz!", getMainMenuKeyboard());
             userSessions.delete(chatId);
-            return bot.answerCallbackQuery(query.id);
-        }
-        if (data === 'ind_dept_search_again') {
-            if (!session || session.step !== 'individual_dept_search') return bot.answerCallbackQuery(query.id);
-            await bot.sendMessage(chatId, "🔍 Iltimos, bo‘lim nomining kamida 3 harfini kiriting:");
-            return bot.answerCallbackQuery(query.id);
-        }
-        if (data === 'ind_emp_search_again') {
-            if (!session || session.step !== 'individual_emp_search') return bot.answerCallbackQuery(query.id);
-            await bot.sendMessage(chatId, "🔍 Iltimos, ismingizning kamida 3 harfini kiriting:");
             return bot.answerCallbackQuery(query.id);
         }
     } catch (err) {
@@ -585,52 +600,8 @@ bot.on('message', async (msg) => {
             const buffer = Buffer.from(await response.arrayBuffer());
             const count = await updateEmployeesFromCSV(buffer);
             await bot.sendMessage(chatId, `✅ ${count} ta xodim yangilandi. Jamoalar saqlanib qoldi.`);
-        } catch (err) {
-            console.error(err);
-            await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
-        }
+        } catch (err) { await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`); }
         userSessions.delete(chatId);
-        return;
-    }
-
-    // Bo'lim qidiruv so'rovi (jamoa yaratish)
-    if (session && session.step === 'awaiting_department_search') {
-        if (text.length < 3) return bot.sendMessage(chatId, "❌ Kamida 3 harf kiriting.");
-        await performDepartmentSearch(chatId, session, text);
-        return;
-    }
-    // Xodim qidiruv so'rovi (jamoa yaratish)
-    if (session && session.step === 'awaiting_employee_search') {
-        if (text.length < 3) return bot.sendMessage(chatId, "❌ Kamida 3 harf kiriting.");
-        await performEmployeeSearch(chatId, session, text, 0);
-        return;
-    }
-    // Yakka ro'yxat: bo'lim qidiruv so'rovi
-    if (session && session.step === 'individual_dept_search') {
-        if (text.length < 3) return bot.sendMessage(chatId, "❌ Kamida 3 harf kiriting.");
-        const results = searchDepartments(text);
-        if (results.length === 0) {
-            await bot.sendMessage(chatId, "❌ Hech qanday bo‘lim topilmadi. Qaytadan kiriting yoki /cancel.");
-            return;
-        }
-        const buttons = results.map(dept => ([{ text: dept, callback_data: `select_ind_dept_${dept}` }]));
-        buttons.push([{ text: "🔄 Qayta qidirish", callback_data: "ind_dept_search_again" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
-        await bot.sendMessage(chatId, `🔎 "${text}" bo‘yicha ${results.length} ta bo‘lim topildi:`, { reply_markup: { inline_keyboard: buttons } });
-        return;
-    }
-    // Yakka ro'yxat: xodim qidiruv so'rovi
-    if (session && session.step === 'individual_emp_search') {
-        if (text.length < 3) return bot.sendMessage(chatId, "❌ Kamida 3 harf kiriting.");
-        const { selectedDepartment } = session;
-        const results = searchEmployeesByDepartment(selectedDepartment, text, []);
-        if (results.length === 0) {
-            await bot.sendMessage(chatId, "❌ Bunday ishchi yo‘q yoki 35 yoshdan oshgan yoki boshqa jamoada ro‘yxatdan o‘tgan. Admin bilan bog‘laning.");
-            userSessions.delete(chatId);
-            return;
-        }
-        const buttons = results.slice(0, 20).map(emp => ([{ text: emp.name, callback_data: `select_ind_emp_${emp.id}` }]));
-        buttons.push([{ text: "🔄 Qayta qidirish", callback_data: "ind_emp_search_again" }, { text: "❌ Bekor qilish", callback_data: "cancel" }]);
-        await bot.sendMessage(chatId, `🔎 "${text}" bo‘yicha ${results.length} ta xodim topildi (ko‘pi bilan 20 tasi ko‘rsatilmoqda):`, { reply_markup: { inline_keyboard: buttons } });
         return;
     }
 
@@ -638,18 +609,14 @@ bot.on('message', async (msg) => {
     if (text === "👥 Jamoani ro'yxatga olish") {
         if (!db.registrationOpen) return bot.sendMessage(chatId, "❌ Ro'yxat yopilgan.");
         if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
-        userSessions.set(chatId, {
-            step: 'awaiting_team_name',
-            teamCreationData: { teamName: '', captainId: null, members: [] },
-            userId
-        });
+        userSessions.set(chatId, { step: 'awaiting_team_name', teamCreationData: { teamName: '', captainId: null, members: [] }, userId });
         return bot.sendMessage(chatId, "Jamoa nomini kiriting:");
     }
     if (text === "👤 Individual ro'yxatga olish") {
         if (!db.registrationOpen) return bot.sendMessage(chatId, "Ro'yxat yopilgan.");
         if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
         userSessions.set(chatId, { step: 'individual', userId });
-        await bot.sendMessage(chatId, "🔍 O‘zingiz ishlaydigan bo‘lim nomining kamida 3 harfini kiriting (masalan: 'Avtobu', 'sex', 'departament'):");
+        await showDepartments(chatId, 'individual', null, userId);
         return;
     }
     if (text === "📄 Mening jamoam") {
@@ -663,11 +630,10 @@ bot.on('message', async (msg) => {
     if (session && session.step === 'awaiting_team_name') {
         if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
         session.teamCreationData.teamName = text;
-        session.step = 'awaiting_department_search';
+        session.step = 'selecting_department';
         session.action = 'captain';
         session.excludeIds = [];
-        await bot.sendMessage(chatId, "Endi sardorni tanlaymiz. Iltimos, sardor ishlaydigan bo‘lim nomining kamida 3 harfini kiriting:");
-        return;
+        await showDepartments(chatId, 'captain', session.teamCreationData, userId);
     }
 });
 
