@@ -42,14 +42,13 @@ async function loadData() {
 }
 
 async function saveDB() {
-  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
+  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
 }
 
 async function saveEmployees() {
-  await fs.writeFile(EMPLOYEES_PATH, JSON.stringify(employees, null, 2));
+  await fs.writeFile(EMPLOYEES_PATH, JSON.stringify(employees, null, 2), 'utf8');
 }
 
-// Xodim mavjudmi? (faqat jamoa va yakkalarda tekshiriladi)
 function isEmployeeAvailable(employeeId) {
   const inTeam = db.teams.some(team => team.members.includes(employeeId));
   const inIndividual = db.individuals.some(ind => ind.employeeId === employeeId);
@@ -84,7 +83,6 @@ function getEmployeeDepartment(id) {
   return emp ? emp.department : '';
 }
 
-// Formatlash
 function formatTeam(team, idx) {
   const captainName = getEmployeeName(team.captainId);
   const memberNames = team.members.map(m => getEmployeeName(m)).join(', ');
@@ -99,9 +97,10 @@ function formatIndividuals() {
   }).join('\n');
 }
 
-// CSV generatsiya (har doim sarlavha bilan)
+// -------------------- CSV GENERATSIYA (UTF-8 BOM bilan) --------------------
 function generateTeamsCSV() {
-  let csv = "Jamoa nomi,Sardor,A'zolar (5 kishi)\n";
+  // BOM qo'shamiz (Excel uchun)
+  let csv = "\uFEFFJamoa nomi,Sardor,A'zolar (5 kishi)\n";
   if (db.teams.length > 0) {
     csv += db.teams.map(team => {
       const captainName = getEmployeeName(team.captainId);
@@ -113,7 +112,7 @@ function generateTeamsCSV() {
 }
 
 function generateIndividualsCSV() {
-  let csv = "Xodim ismi,Bo'lim\n";
+  let csv = "\uFEFFXodim ismi,Bo'lim\n";
   if (db.individuals.length > 0) {
     csv += db.individuals.map(ind => {
       const emp = employees.employees.find(e => e.id === ind.employeeId);
@@ -123,7 +122,7 @@ function generateIndividualsCSV() {
   return csv;
 }
 
-// -------------------- PDF ARIZA YARATISH (printerga tayyor) --------------------
+// -------------------- PDF ARIZA --------------------
 async function generateApplicationPDF(team) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -132,13 +131,11 @@ async function generateApplicationPDF(team) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // Sarlavha
     doc.fontSize(18).font('Helvetica-Bold').text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(16).text('QATNASHISH UCHUN ARIZA', { align: 'center' });
     doc.moveDown(1.5);
 
-    // Jamoa ma'lumotlari
     doc.fontSize(12).font('Helvetica-Bold');
     doc.text(`Jamoa nomi: ${team.teamName}`, { underline: true });
     doc.moveDown(0.5);
@@ -146,7 +143,6 @@ async function generateApplicationPDF(team) {
     doc.text(`A'zolar soni: ${team.members.length} nafar`);
     doc.moveDown(1);
 
-    // Jadval sarlavhasi
     const startY = doc.y;
     doc.font('Helvetica-Bold');
     doc.text('№', 50, startY);
@@ -162,16 +158,11 @@ async function generateApplicationPDF(team) {
     
     for (let i = 0; i < team.members.length; i++) {
       const empId = team.members[i];
-      const name = getEmployeeName(empId);
-      const position = getEmployeePosition(empId);
-      const dept = getEmployeeDepartment(empId);
-      
       doc.text(`${i+1}`, 50, currentY + 5);
-      doc.text(name, 80, currentY + 5, { width: 160 });
-      doc.text(position || '—', 250, currentY + 5, { width: 90 });
-      doc.text(dept || '—', 350, currentY + 5, { width: 90 });
+      doc.text(getEmployeeName(empId), 80, currentY + 5, { width: 160 });
+      doc.text(getEmployeePosition(empId) || '—', 250, currentY + 5, { width: 90 });
+      doc.text(getEmployeeDepartment(empId) || '—', 350, currentY + 5, { width: 90 });
       doc.text('__________', 450, currentY + 5);
-      
       currentY += 25;
       if (currentY > 700) {
         doc.addPage();
@@ -200,9 +191,14 @@ async function generateApplicationPDF(team) {
   });
 }
 
-// -------------------- ADMIN FUNKSIYASI: CSV dan xodimlarni yangilash (jamoalar saqlanadi) --------------------
+// -------------------- XODIMLARNI CSV DAN YUKLASH --------------------
 async function updateEmployeesFromCSV(fileBuffer) {
-  const content = fileBuffer.toString('utf8');
+  // UTF-8 BOM ni olib tashlash
+  let content = fileBuffer.toString('utf8');
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  
   const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
   if (lines.length < 2) throw new Error('CSVda kamida 2 qator bo‘lishi kerak');
 
@@ -216,8 +212,7 @@ async function updateEmployeesFromCSV(fileBuffer) {
   let newId = 1;
   
   for (let i = startIdx; i < lines.length; i++) {
-    // 174-qatorni quyidagicha o'zgartiring:
-const parts = lines[i].split(/[;,]/).map(p => p.trim().replace(/^"|"$/g, ''));
+    const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
     if (parts.length < 4) continue;
     
     const name = parts[1];
@@ -236,7 +231,6 @@ const parts = lines[i].split(/[;,]/).map(p => p.trim().replace(/^"|"$/g, ''));
   if (newEmployees.length === 0) throw new Error('Hech qanday xodim topilmadi');
   
   // Eski xodimlar ID larini yangilari bilan almashtirish
-  // Jamoalar va yakkalardagi eski ID larni yangi ID ga o'tkazish
   const oldToNewId = new Map();
   for (let i = 0; i < employees.employees.length && i < newEmployees.length; i++) {
     if (employees.employees[i] && newEmployees[i]) {
@@ -279,7 +273,7 @@ function getMainMenuKeyboard() {
   };
 }
 
-// -------------------- JAMOA YARATISH FLOW --------------------
+// -------------------- JAMOA YARATISH --------------------
 async function askDepartment(chatId, action) {
   const departments = getDepartments();
   if (departments.length === 0) {
@@ -307,7 +301,6 @@ async function askNextMember(chatId, session) {
 async function finalizeTeam(chatId, userId, teamData) {
   const { teamName, captainId, members } = teamData;
   
-  // Takroriy tekshiruv
   for (const empId of members) {
     if (!isEmployeeAvailable(empId)) {
       await bot.sendMessage(chatId, `❌ Xodim ${getEmployeeName(empId)} endi band. Qaytadan boshlang.`);
@@ -328,41 +321,40 @@ async function finalizeTeam(chatId, userId, teamData) {
   db.teams.push(newTeam);
   await saveDB();
   
-  // PDF yaratish va yuborish
   const pdfBuffer = await generateApplicationPDF(newTeam);
   await bot.sendDocument(chatId, pdfBuffer, {
-    filename: `Zakovat_Ariza_${teamName.replace(/\s/g, '_')}.pdf`,
+    filename: `Zakovat_Ariza_${teamName.replace(/[^a-zA-Z0-9_]/g, '_')}.pdf`,
     contentType: 'application/pdf',
-    caption: `✅ "${teamName}" jamoasi muvaffaqiyatli ro‘yxatdan o‘tdi!\n\n📄 Quyida rasmiy ariza shakli (printerda chiqarish uchun).`
+    caption: `✅ "${teamName}" jamoasi ro‘yxatdan o‘tdi!`
   });
   
-  await bot.sendMessage(chatId, "Arizani yuklab oldingiz. Turnirda omad tilaymiz!", getMainMenuKeyboard());
+  await bot.sendMessage(chatId, "Arizani yuklab oldingiz. Omad!", getMainMenuKeyboard());
   userSessions.delete(chatId);
   return true;
 }
 
 // -------------------- BOT HANDLERLARI --------------------
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "Assalomu alaykum! Zakovat o'yiniga xush kelibsiz.\nQuyidagi tugmalar orqali ro'yxatdan o'tishingiz mumkin:", getMainMenuKeyboard());
+  bot.sendMessage(msg.chat.id, "Assalomu alaykum! Zakovat o'yiniga xush kelibsiz.", getMainMenuKeyboard());
 });
 
 bot.onText(/\/admin/, async (msg) => {
   const chatId = msg.chat.id;
   if (!ADMIN_IDS.includes(msg.from.id)) {
-    return bot.sendMessage(chatId, "⛔ Bu buyruq faqat adminlar uchun.");
+    return bot.sendMessage(chatId, "⛔ Faqat adminlar.");
   }
   
   const adminButtons = {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "📋 Jamoalarni ko'rish", callback_data: "admin_view_teams" }],
-        [{ text: "👤 Yakkalarni ko'rish", callback_data: "admin_view_individuals" }],
+        [{ text: "📋 Jamoalar", callback_data: "admin_view_teams" }],
+        [{ text: "👤 Yakkalar", callback_data: "admin_view_individuals" }],
         [{ text: "📁 Jamoalar CSV", callback_data: "admin_export_teams" }],
         [{ text: "📁 Yakkalar CSV", callback_data: "admin_export_individuals" }],
-        [{ text: "📁 JSON (jamoalar)", callback_data: "admin_export_json" }],
-        [{ text: "🎲 Tasodifiy jamoalar", callback_data: "admin_random_teams" }],
-        [{ text: db.registrationOpen ? "🔒 Ro'yxatni yopish" : "🔓 Ro'yxatni ochish", callback_data: "admin_toggle_registration" }],
-        [{ text: "📂 Xodimlarni CSV dan yuklash", callback_data: "admin_upload_employees" }]
+        [{ text: "📁 JSON", callback_data: "admin_export_json" }],
+        [{ text: "🎲 Tasodifiy", callback_data: "admin_random_teams" }],
+        [{ text: db.registrationOpen ? "🔒 Yopish" : "🔓 Ochish", callback_data: "admin_toggle_registration" }],
+        [{ text: "📂 Xodimlar CSV", callback_data: "admin_upload_employees" }]
       ]
     }
   };
@@ -373,13 +365,11 @@ bot.onText(/\/cancel/, (msg) => {
   const chatId = msg.chat.id;
   if (userSessions.has(chatId)) {
     userSessions.delete(chatId);
-    bot.sendMessage(chatId, "Jarayon bekor qilindi.", getMainMenuKeyboard());
-  } else {
-    bot.sendMessage(chatId, "Hech qanday faol jarayon yo'q.");
+    bot.sendMessage(chatId, "Bekor qilindi.", getMainMenuKeyboard());
   }
 });
 
-// -------------------- CALLBACK QUERY HANDLER --------------------
+// -------------------- CALLBACK QUERY --------------------
 bot.on('callback_query', async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
   const userId = callbackQuery.from.id;
@@ -393,98 +383,110 @@ bot.on('callback_query', async (callbackQuery) => {
       return bot.answerCallbackQuery(callbackQuery.id);
     }
 
-    // ========== ADMIN PANELI ==========
+    // ADMIN
     if (ADMIN_IDS.includes(userId)) {
       if (data === 'admin_view_teams') {
-        let msg = "📋 Jamoalar ro'yxati:\n\n";
-        if (db.teams.length === 0) msg = "Hozircha hech qanday jamoa yo'q.";
-        else db.teams.forEach((team, idx) => { msg += formatTeam(team, idx) + "\n\n"; });
+        let msg = db.teams.length ? "📋 Jamoalar:\n\n" + db.teams.map((t, i) => formatTeam(t, i)).join('\n\n') : "Hech qanday jamoa yo'q.";
         await bot.sendMessage(chatId, msg);
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_view_individuals') {
-        const msg = `👤 Yakka ro'yxat:\n${formatIndividuals()}`;
-        await bot.sendMessage(chatId, msg);
+        await bot.sendMessage(chatId, `👤 Yakkalar:\n${formatIndividuals()}`);
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_export_teams') {
-        const csv = generateTeamsCSV();
-        await bot.sendDocument(chatId, Buffer.from(csv, 'utf8'), { filename: 'jamoalar.csv', contentType: 'text/csv' });
-        await bot.sendMessage(chatId, `✅ ${db.teams.length} ta jamoa eksport qilindi.`);
+        try {
+          await bot.sendMessage(chatId, "⏳ CSV tayyorlanmoqda...");
+          const csv = generateTeamsCSV();
+          const buffer = Buffer.from(csv, 'utf8');
+          if (buffer.length > 45 * 1024 * 1024) {
+            await bot.sendMessage(chatId, "⚠️ Fayl juda katta (45MB+). Ma'lumotlarni qisqartiring.");
+          } else {
+            await bot.sendDocument(chatId, buffer, { filename: 'jamoalar.csv', contentType: 'text/csv' });
+            await bot.sendMessage(chatId, `✅ ${db.teams.length} ta jamoa eksport qilindi.`);
+          }
+        } catch (err) {
+          await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
+        }
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_export_individuals') {
-        const csv = generateIndividualsCSV();
-        await bot.sendDocument(chatId, Buffer.from(csv, 'utf8'), { filename: 'yakkalar.csv', contentType: 'text/csv' });
-        await bot.sendMessage(chatId, `✅ ${db.individuals.length} ta yakka eksport qilindi.`);
+        try {
+          const csv = generateIndividualsCSV();
+          await bot.sendDocument(chatId, Buffer.from(csv, 'utf8'), { filename: 'yakkalar.csv', contentType: 'text/csv' });
+          await bot.sendMessage(chatId, `✅ ${db.individuals.length} ta yakka eksport qilindi.`);
+        } catch (err) {
+          await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
+        }
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_export_json') {
-        const teamsJson = JSON.stringify(db.teams, null, 2);
-        await bot.sendDocument(chatId, Buffer.from(teamsJson, 'utf8'), { filename: 'jamoalar.json', contentType: 'application/json' });
-        await bot.sendMessage(chatId, "✅ Jamoalar JSON formatda yuklab olindi.");
+        try {
+          const jsonData = JSON.stringify(db.teams, null, 2);
+          await bot.sendDocument(chatId, Buffer.from(jsonData, 'utf8'), { filename: 'jamoalar.json', contentType: 'application/json' });
+          await bot.sendMessage(chatId, "✅ JSON yuklab olindi.");
+        } catch (err) {
+          await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
+        }
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_random_teams') {
         if (db.individuals.length < 5) {
-          await bot.sendMessage(chatId, "❌ Tasodifiy jamoa yaratish uchun kamida 5 nafar yakka ishtirokchi kerak.");
+          await bot.sendMessage(chatId, "❌ Kamida 5 yakka kerak.");
           return bot.answerCallbackQuery(callbackQuery.id);
         }
         
         const shuffled = [...db.individuals].sort(() => Math.random() - 0.5);
         const newTeams = [];
-        const usedEmployees = new Set();
+        const used = new Set();
         
         for (let i = 0; i + 5 <= shuffled.length; i += 5) {
           const group = shuffled.slice(i, i + 5).map(x => x.employeeId);
           newTeams.push({
             teamId: Date.now() + i,
-            teamName: `Random guruh ${Math.floor(i / 5) + 1}`,
+            teamName: `Random ${Math.floor(i / 5) + 1}`,
             captainId: group[0],
             members: group,
             createdBy: userId,
             createdAt: new Date().toISOString()
           });
-          group.forEach(id => usedEmployees.add(id));
+          group.forEach(id => used.add(id));
         }
         
-        const remainingIndividuals = shuffled.filter(ind => !usedEmployees.has(ind.employeeId));
         db.teams.push(...newTeams);
-        db.individuals = remainingIndividuals;
+        db.individuals = db.individuals.filter(ind => !used.has(ind.employeeId));
         await saveDB();
-        
-        await bot.sendMessage(chatId, `🎉 ${newTeams.length} ta tasodifiy jamoa yaratildi! Qolgan yakkaliklar: ${remainingIndividuals.length}`);
+        await bot.sendMessage(chatId, `🎉 ${newTeams.length} ta jamoa yaratildi. Qolgan: ${db.individuals.length}`);
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_toggle_registration') {
         db.registrationOpen = !db.registrationOpen;
         await saveDB();
-        const status = db.registrationOpen ? "ochiq" : "yopiq";
-        await bot.sendMessage(chatId, `📌 Ro'yxatga olish ${status}.`);
+        await bot.sendMessage(chatId, `Ro'yxat ${db.registrationOpen ? "ochiq" : "yopiq"}.`);
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
       if (data === 'admin_upload_employees') {
         userSessions.set(chatId, { step: 'awaiting_csv' });
-        await bot.sendMessage(chatId, "📂 CSV faylni yuboring.\n\nFormat: t/r, Ism, Lavozim, Bo'lim\nMisol:\n1, Alijon Valiyev, Muhandis, Mexanika");
+        await bot.sendMessage(chatId, "📂 CSV faylni yuboring.\n\nFormat: t/r, Ism, Lavozim, Bo'lim");
         return bot.answerCallbackQuery(callbackQuery.id);
       }
     }
 
-    // ========== JAMOA YARATISH ==========
+    // JAMOA YARATISH
     if (data.startsWith('dept_')) {
       const parts = data.split('_');
       const action = parts[1];
       const department = parts.slice(2).join('_');
       
       if (!session || session.step !== action) {
-        await bot.sendMessage(chatId, "Iltimos, avval 'Jamoa yaratish' tugmasini bosing.");
+        await bot.sendMessage(chatId, "Avval 'Jamoa yaratish' tugmasini bosing.");
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
@@ -492,7 +494,7 @@ bot.on('callback_query', async (callbackQuery) => {
       const available = getAvailableEmployeesByDepartment(department, excludeIds);
       
       if (available.length === 0) {
-        await bot.sendMessage(chatId, "Bu bo'limda mavjud xodimlar yo'q.");
+        await bot.sendMessage(chatId, "Bu bo'limda mavjud xodim yo'q.");
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
@@ -502,7 +504,7 @@ bot.on('callback_query', async (callbackQuery) => {
       }]));
       empButtons.push([{ text: "⬅️ Orqaga", callback_data: "back_departments" }]);
       
-      await bot.sendMessage(chatId, `"${department}" bo'limidan xodim tanlang:`, {
+      await bot.sendMessage(chatId, `"${department}" bo'limidan tanlang:`, {
         reply_markup: { inline_keyboard: empButtons }
       });
       return bot.answerCallbackQuery(callbackQuery.id);
@@ -519,7 +521,7 @@ bot.on('callback_query', async (callbackQuery) => {
       }
       
       if (!isEmployeeAvailable(employeeId)) {
-        await bot.sendMessage(chatId, `❌ ${getEmployeeName(employeeId)} allaqachon band.`);
+        await bot.sendMessage(chatId, `❌ ${getEmployeeName(employeeId)} band.`);
         userSessions.delete(chatId);
         return bot.answerCallbackQuery(callbackQuery.id);
       }
@@ -547,12 +549,12 @@ bot.on('callback_query', async (callbackQuery) => {
       return bot.answerCallbackQuery(callbackQuery.id);
     }
     
-    // ========== YAKKA RO'YXAT ==========
+    // YAKKA RO'YXAT
     if (data.startsWith('dept_individual_')) {
       const department = data.split('_')[2];
       
       if (!session || session.step !== 'individual') {
-        await bot.sendMessage(chatId, "Iltimos, avval 'Yakka ro'yxat' tugmasini bosing.");
+        await bot.sendMessage(chatId, "Avval 'Yakka ro'yxat' tugmasini bosing.");
         return bot.answerCallbackQuery(callbackQuery.id);
       }
       
@@ -580,7 +582,7 @@ bot.on('callback_query', async (callbackQuery) => {
       
       db.individuals.push({ employeeId, registeredAt: new Date().toISOString(), telegramUserId: userId });
       await saveDB();
-      await bot.sendMessage(chatId, "✅ Yakka ro'yxatga olindingiz. Admin sizni jamoada guruhlaydi.", getMainMenuKeyboard());
+      await bot.sendMessage(chatId, "✅ Yakka ro'yxatga olindingiz.", getMainMenuKeyboard());
       userSessions.delete(chatId);
       return bot.answerCallbackQuery(callbackQuery.id);
     }
@@ -594,7 +596,7 @@ bot.on('callback_query', async (callbackQuery) => {
     
   } catch (err) {
     console.error('Xatolik:', err);
-    await bot.sendMessage(chatId, "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
   }
   bot.answerCallbackQuery(callbackQuery.id);
 });
@@ -606,41 +608,27 @@ bot.on('message', async (msg) => {
   const userId = msg.from.id;
   const session = userSessions.get(chatId);
 
- // Admin CSV yuklash
-  if (session && session.step === 'awaiting_csv' && (msg.document || msg.audio)) {
+  // Admin CSV yuklash
+  if (session && session.step === 'awaiting_csv' && msg.document) {
     if (!ADMIN_IDS.includes(userId)) return;
-    
-    const fileId = msg.document ? msg.document.file_id : msg.audio.file_id;
-    
     try {
-      await bot.sendMessage(chatId, "⏳ Fayl ishlanmoqda...");
-      const file = await bot.getFile(fileId);
+      await bot.sendMessage(chatId, "⏳ Xodimlar yuklanmoqda...");
+      const file = await bot.getFile(msg.document.file_id);
       const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-      
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Faylni yuklab bo‘lmadi');
-      
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      
+      const buffer = Buffer.from(await response.arrayBuffer());
       const count = await updateEmployeesFromCSV(buffer);
-      await bot.sendMessage(chatId, `✅ Muvaffaqiyatli! ${count} ta xodim bazaga kiritildi.`, getMainMenuKeyboard());
+      await bot.sendMessage(chatId, `✅ ${count} ta xodim yangilandi. Jamoalar saqlanib qoldi.`);
     } catch (err) {
-      console.error(err);
-      await bot.sendMessage(chatId, `❌ Xatolik yuz berdi: ${err.message}`);
+      await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
     }
     userSessions.delete(chatId);
     return;
   }
 
-  // Asosiy menyu
   if (text === "👥 Jamoa yaratish") {
-    if (!db.registrationOpen) {
-      return bot.sendMessage(chatId, "❌ Ro'yxatga olish yopilgan.");
-    }
-    if (userSessions.has(chatId)) {
-      return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel bilan bekor qiling.");
-    }
+    if (!db.registrationOpen) return bot.sendMessage(chatId, "❌ Ro'yxat yopilgan.");
+    if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
     userSessions.set(chatId, {
       step: 'awaiting_team_name',
       teamCreationData: { teamName: '', captainId: null, members: [] },
@@ -650,39 +638,31 @@ bot.on('message', async (msg) => {
   }
   
   if (text === "👤 Yakka ro'yxat") {
-    if (!db.registrationOpen) {
-      return bot.sendMessage(chatId, "Ro'yxatga olish yopilgan.");
-    }
-    if (userSessions.has(chatId)) {
-      return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel bilan bekor qiling.");
-    }
+    if (!db.registrationOpen) return bot.sendMessage(chatId, "Ro'yxat yopilgan.");
+    if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
     userSessions.set(chatId, { step: 'individual', userId });
     return askDepartment(chatId, 'individual');
   }
   
   if (text === "📄 Mening jamoam") {
     const userTeam = db.teams.find(team => team.createdBy === userId);
-    if (!userTeam) {
-      return bot.sendMessage(chatId, "Siz hali jamoa yaratmagansiz.");
-    }
+    if (!userTeam) return bot.sendMessage(chatId, "Siz jamoa yaratmagansiz.");
     try {
       const pdfBuffer = await generateApplicationPDF(userTeam);
       await bot.sendDocument(chatId, pdfBuffer, {
-        filename: `Zakovat_Ariza_${userTeam.teamName.replace(/\s/g, '_')}.pdf`,
-        contentType: 'application/pdf',
-        caption: `📄 "${userTeam.teamName}" jamoasi arizasi`
+        filename: `Zakovat_Ariza_${userTeam.teamName.replace(/[^a-zA-Z0-9_]/g, '_')}.pdf`,
+        contentType: 'application/pdf'
       });
     } catch (err) {
-      await bot.sendMessage(chatId, "❌ PDF yaratishda xatolik.");
+      await bot.sendMessage(chatId, `❌ PDF xatolik: ${err.message}`);
     }
     return;
   }
   
   if (text === "ℹ️ Yordam") {
-    return bot.sendMessage(chatId, "📌 **Yordam**\n\n• Jamoa yaratish: 5 a'zo (sardor + 4)\n• Yakka ro'yxat: admin guruhlaydi\n• Mening jamoam: PDF ariza yuklab olish\n• Admin: /admin\n• Bekor qilish: /cancel", { parse_mode: 'Markdown' });
+    return bot.sendMessage(chatId, "📌 Jamoa: 5 a'zo | Yakka: admin guruhlaydi | Mening jamoam: PDF");
   }
   
-  // Jamoa nomi
   if (session && session.step === 'awaiting_team_name') {
     if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
     session.teamCreationData.teamName = text;
@@ -696,7 +676,7 @@ bot.on('message', async (msg) => {
 const app = express();
 app.get('/', (req, res) => res.send('Zakovat bot ishlayapti'));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`HTTP server ${PORT} portda`));
+app.listen(PORT, () => console.log(`HTTP ${PORT}`));
 
 // -------------------- BOSHLASH --------------------
 loadData().then(() => console.log('✅ Bot ishga tushdi!')).catch(console.error);
