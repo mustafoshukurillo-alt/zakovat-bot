@@ -1,9 +1,8 @@
 {
   "name": "zakovat-bot",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "scripts": {
-    "start": "node index.js",
-    "install-deps": "npm install node-telegram-bot-api express pdfkit archiver"
+    "start": "node index.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0",
