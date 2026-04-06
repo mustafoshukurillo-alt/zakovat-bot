@@ -1,7 +1,7 @@
 {
   "name": "zakovat-bot",
-  "version": "3.0.0",
-  "description": "Zakovat o‘yini uchun Telegram bot",
+  "version": "4.0.0",
+  "description": "Zakovat turniri uchun Telegram bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
