@@ -3,6 +3,7 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const archiver = require('archiver');
 
 // -------------------- KONFIGURATSIYA --------------------
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -12,7 +13,7 @@ if (!BOT_TOKEN) {
 }
 const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
 
-// ========== POLLING OPTIMALLASHTIRISH ==========
+// Polling konfiguratsiyasi - takroriy xabarlarni oldini olish
 const bot = new TelegramBot(BOT_TOKEN, { 
     polling: {
         interval: 500,
@@ -22,12 +23,12 @@ const bot = new TelegramBot(BOT_TOKEN, {
     }
 });
 
-// Webhook ni o'chirish (bir marta)
+// Webhook ni o'chirish (bir marta ishga tushganda)
 (async () => {
     try {
         await bot.deleteWebHook();
         console.log('✅ Webhook o\'chirildi');
-    } catch(e) {}
+    } catch (e) {}
 })();
 
 // -------------------- MA'LUMOTLAR YO'LLARI --------------------
@@ -72,7 +73,7 @@ async function loadData() {
         if (!employees.employees) employees.employees = [];
         console.log('✅ employees.json yuklandi, xodimlar soni:', employees.employees.length);
     } catch (err) {
-        console.error('employees.json topilmadi:', err.message);
+        console.error('employees.json topilmadi yoki xato:', err.message);
         employees = { employees: [] };
     }
 }
@@ -98,7 +99,7 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        doc.fontSize(18).text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
+        doc.fontSize(18).font('Helvetica-Bold').text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
         doc.moveDown(0.5).fontSize(16).text('QATNASHISH UCHUN ARIZA', { align: 'center' });
         doc.moveDown(1.5);
 
@@ -106,19 +107,20 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
             doc.fontSize(12).text(`Ishtirokchi: ${teamData.name}`, { underline: true });
             doc.text(`Bo'lim: ${teamData.department}`);
             doc.text(`Lavozim: ${teamData.position || '—'}`);
-            doc.text(`Ro'yxatga olingan: ${new Date(teamData.registeredAt).toLocaleString('uz-UZ')}`);
+            doc.text(`Ro'yxatga olingan sana: ${new Date(teamData.registeredAt).toLocaleString('uz-UZ')}`);
         } else {
             doc.fontSize(12).text(`Jamoa nomi: ${teamData.teamName}`, { underline: true });
             doc.text(`Sardor: ${teamData.captainName} (${teamData.captainDepartment})`);
             doc.text(`A'zolar soni: ${teamData.members.length} nafar`);
             doc.moveDown(1);
 
+            const startY = doc.y;
             doc.font('Helvetica-Bold');
-            doc.text('№', 50, doc.y);
-            doc.text('F.I.SH.', 80, doc.y);
-            doc.text('Lavozim', 250, doc.y);
-            doc.text('Bo‘lim', 350, doc.y);
-            doc.text('Imzo', 450, doc.y);
+            doc.text('№', 50, startY);
+            doc.text('F.I.SH.', 80, startY);
+            doc.text('Lavozim', 250, startY);
+            doc.text('Bo‘lim', 350, startY);
+            doc.text('Imzo', 450, startY);
             doc.moveDown(0.5);
             doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
 
@@ -132,114 +134,35 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
                 doc.text(m.department, 350, currentY+5, { width: 90 });
                 doc.text('__________', 450, currentY+5);
                 currentY += 25;
-                if (currentY > 700) { doc.addPage(); currentY = 50; }
+                if (currentY > 700) {
+                    doc.addPage();
+                    currentY = 50;
+                    doc.font('Helvetica-Bold');
+                    doc.text('№', 50, currentY);
+                    doc.text('F.I.SH.', 80, currentY);
+                    doc.text('Lavozim', 250, currentY);
+                    doc.text('Bo‘lim', 350, currentY);
+                    doc.text('Imzo', 450, currentY);
+                    doc.moveDown(0.5);
+                    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+                    currentY = doc.y;
+                    doc.font('Helvetica');
+                }
             }
         }
+
         doc.moveDown(2);
+        doc.font('Helvetica-Bold');
         doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
-        doc.text(isIndividual ? 'Ishtirokchi imzosi: ____________________' : 'Sardor imzosi: ____________________', { align: 'right' });
+        doc.moveDown(0.5);
+        if (isIndividual) {
+            doc.text('Ishtirokchi imzosi: ____________________', { align: 'right' });
+        } else {
+            doc.text('Sardor imzosi: ____________________', { align: 'right' });
+        }
         doc.text('Tashkilot muhri: ____________________', { align: 'right' });
         doc.end();
     });
-}
-
-// -------------------- BO'LIMLARNI 4 XABARGA BO'LIB CHIQARISH --------------------
-const DEPTS_PER_MESSAGE = 9; // 33/4 ≈ 8.25, har bir xabarda 9 tadan
-
-async function showDepartmentsPaged(chatId, prefix, page = 0) {
-    const totalMessages = Math.ceil(DEPARTMENTS_LIST.length / DEPTS_PER_MESSAGE);
-    const start = page * DEPTS_PER_MESSAGE;
-    const end = start + DEPTS_PER_MESSAGE;
-    const pageDepts = DEPARTMENTS_LIST.slice(start, end);
-    
-    const buttons = pageDepts.map(dept => ([{ text: dept, callback_data: `${prefix}_${dept}` }]));
-    
-    const navRow = [];
-    if (page > 0) navRow.push({ text: "⬅️ Oldingi", callback_data: `${prefix}_page_${page-1}` });
-    if (page < totalMessages - 1) navRow.push({ text: "Keyingi ➡️", callback_data: `${prefix}_page_${page+1}` });
-    if (navRow.length) buttons.push(navRow);
-    buttons.push([{ text: "❌ Bekor qilish", callback_data: "cancel" }]);
-    
-    await bot.sendMessage(chatId, `📌 Bo'limni tanlang (${page+1}/${totalMessages}):`, { reply_markup: { inline_keyboard: buttons } });
-}
-
-// -------------------- RANDOM JAMOA YARATISH (INDIVIDUALLARDAN) --------------------
-async function createRandomTeams(chatId, adminId) {
-    if (db.individuals.length < 5) {
-        await bot.sendMessage(chatId, "❌ Random jamoa yaratish uchun kamida 5 ta individual ishtirokchi kerak.");
-        return false;
-    }
-    
-    // Tasodifiy aralashtirish
-    const shuffled = [...db.individuals];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    
-    const newTeams = [];
-    const usedIds = new Set();
-    const formedIndividuals = [];
-    
-    for (let i = 0; i + 5 <= shuffled.length; i += 5) {
-        const group = shuffled.slice(i, i + 5);
-        const members = group.map(ind => ({
-            name: ind.name,
-            position: ind.position || '—',
-            department: ind.department
-        }));
-        const teamId = Date.now() + i;
-        newTeams.push({
-            teamId: teamId,
-            teamName: `Random guruh ${Math.floor(i/5) + 1}`,
-            captainName: members[0].name,
-            captainDepartment: members[0].department,
-            members: members,
-            createdBy: adminId,
-            createdAt: new Date().toISOString()
-        });
-        group.forEach(ind => {
-            usedIds.add(ind.id);
-            formedIndividuals.push(ind);
-        });
-    }
-    
-    // Saqlash
-    db.teams.push(...newTeams);
-    db.individuals = db.individuals.filter(ind => !usedIds.has(ind.id));
-    await saveDB();
-    
-    // Har bir ishtirokchiga xabar yuborish
-    for (const team of newTeams) {
-        const membersTelegramIds = team.members.map((_, idx) => {
-            const original = shuffled.find(ind => ind.name === team.members[idx].name);
-            return original?.telegramUserId;
-        }).filter(id => id);
-        
-        const teamText = `🎉 Tabriklaymiz! Siz random jamoa tarkibiga kiritildingiz!\n\n🏷 Jamoa nomi: ${team.teamName}\n👨‍💼 Sardor: ${team.captainName}\n👥 A'zolar:\n${team.members.map((m,i) => `${i+1}. ${m.name} (${m.department})`).join('\n')}\n\n✅ Arizangiz avtomatik yaratildi.`;
-        
-        // PDF yaratish va yuborish (sardorga)
-        const pdfBuffer = await generateApplicationPDF({
-            teamName: team.teamName,
-            captainName: team.captainName,
-            captainDepartment: team.captainDepartment,
-            members: team.members
-        }, false);
-        
-        // Sardorga (birinchi a'zoga) PDF yuboramiz
-        if (membersTelegramIds[0]) {
-            try {
-                await bot.sendDocument(membersTelegramIds[0], pdfBuffer, {
-                    filename: `random_ariya_${team.teamId}.pdf`,
-                    contentType: 'application/pdf',
-                    caption: teamText
-                });
-            } catch(e) { console.error('Xabar yuborish xatosi:', e.message); }
-        }
-    }
-    
-    await bot.sendMessage(chatId, `🎉 ${newTeams.length} ta random jamoa yaratildi! Qolgan individual ishtirokchilar: ${db.individuals.length}`);
-    return true;
 }
 
 // -------------------- BOT UI --------------------
@@ -254,6 +177,120 @@ function getMainMenuKeyboard() {
             resize_keyboard: true
         }
     };
+}
+
+// -------------------- BO'LIMLARNI 4 TA SAHIFAGA BO'LISH --------------------
+const DEPARTMENTS_PER_PAGE = Math.ceil(DEPARTMENTS_LIST.length / 4); // 9 tadan (33/4=8.25 -> 9)
+
+async function showDepartments(chatId, prefix, page = 0) {
+    const totalPages = 4;
+    const start = page * DEPARTMENTS_PER_PAGE;
+    const end = start + DEPARTMENTS_PER_PAGE;
+    const pageDepts = DEPARTMENTS_LIST.slice(start, end);
+    
+    const buttons = [];
+    for (let i = 0; i < pageDepts.length; i++) {
+        buttons.push([{ text: pageDepts[i], callback_data: `${prefix}_${pageDepts[i]}` }]);
+    }
+    
+    // Navigatsiya tugmalari (4 ta sahifa)
+    const navRow = [];
+    for (let i = 0; i < totalPages; i++) {
+        navRow.push({ text: i === page ? `📌 ${i+1}` : `${i+1}`, callback_data: `${prefix}_page_${i}` });
+    }
+    buttons.push(navRow);
+    buttons.push([{ text: "❌ Bekor qilish", callback_data: "cancel" }]);
+    
+    await bot.sendMessage(chatId, `📌 Iltimos, bo'limni tanlang (${page+1}/${totalPages} sahifa):`, { reply_markup: { inline_keyboard: buttons } });
+    
+    const session = userSessions.get(chatId) || {};
+    userSessions.set(chatId, { ...session, deptPage: page, deptPrefix: prefix });
+}
+
+// -------------------- TASODIFIY JAMOA YARATISH (YAKKALARDAN) --------------------
+async function createRandomTeams(chatId, userId) {
+    if (db.individuals.length < 5) {
+        await bot.sendMessage(chatId, "❌ Tasodifiy jamoa yaratish uchun kamida 5 ta yakka ishtirokchi kerak.");
+        return false;
+    }
+    
+    // Tasodifiy aralashtirish
+    const shuffled = [...db.individuals];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    const newTeams = [];
+    const usedIds = new Set();
+    let teamCounter = 1;
+    
+    for (let i = 0; i + 5 <= shuffled.length; i += 5) {
+        const group = shuffled.slice(i, i + 5);
+        const teamId = Date.now() + teamCounter;
+        const teamName = `Random guruh ${teamCounter}`;
+        const captain = group[0];
+        
+        const newTeam = {
+            teamId: teamId,
+            teamName: teamName,
+            captainName: captain.name,
+            captainDepartment: captain.department,
+            members: group.map((m, idx) => ({
+                name: m.name,
+                position: m.position || '—',
+                department: m.department,
+                role: idx === 0 ? 'Sardor' : 'A\'zo'
+            })),
+            createdBy: userId,
+            createdAt: new Date().toISOString()
+        };
+        newTeams.push(newTeam);
+        group.forEach(m => usedIds.add(m.id));
+        teamCounter++;
+    }
+    
+    // Qolgan yakkalarni saqlash
+    const remaining = shuffled.filter(m => !usedIds.has(m.id));
+    
+    // Jamoalarni qo'shish
+    db.teams.push(...newTeams);
+    db.individuals = remaining;
+    await saveDB();
+    
+    // Har bir jamoa sardoriga xabar yuborish
+    for (const team of newTeams) {
+        // Sardor Telegram ID sini topish (individual ro'yxatda saqlangan)
+        const captainOriginal = shuffled.find(m => m.name === team.captainName && m.department === team.captainDepartment);
+        if (captainOriginal && captainOriginal.telegramUserId) {
+            try {
+                await bot.sendMessage(captainOriginal.telegramUserId, 
+                    `🎉 Tabriklaymiz! Siz "${team.teamName}" jamoasining sardori etib tayinlandingiz!\n\nJamoa tarkibi:\n${team.members.map((m,i) => `${i+1}. ${m.name} (${m.department})`).join('\n')}\n\nArizangizni /start orqali "Mening jamoam" tugmasidan yuklab olishingiz mumkin.`);
+            } catch(e) {}
+        }
+    }
+    
+    await bot.sendMessage(chatId, `🎲 ${newTeams.length} ta tasodifiy jamoa yaratildi!\nQolgan yakka ishtirokchilar: ${remaining.length}`);
+    return true;
+}
+
+// -------------------- RESET BOT (TOZALASH) --------------------
+async function resetBot(chatId) {
+    // Bazani tozalash
+    db = { teams: [], individuals: [], registrationOpen: true };
+    await saveDB();
+    // Vaqtinchalik fayllarni o'chirish
+    try {
+        const files = await fs.readdir(__dirname);
+        for (const file of files) {
+            if (file.startsWith('temp_') || file.startsWith('ariya_') || file.startsWith('individual_')) {
+                await fs.unlink(path.join(__dirname, file)).catch(()=>{});
+            }
+        }
+    } catch(e) {}
+    // Sessiyalarni tozalash
+    userSessions.clear();
+    await bot.sendMessage(chatId, "✅ Bot to'liq tozalandi! Barcha jamoalar, yakkalar va vaqtinchalik fayllar o'chirildi.\n\nBotni qayta ishga tushirish shart emas, yangidan ro'yxatga olish mumkin.");
 }
 
 // -------------------- JAMOA YARATISH --------------------
@@ -346,9 +383,9 @@ bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId,
         "Assalomu alaykum! Siz SamAuto Zakovat o'yinida ro'yxatdan o'tish botiga xush keldingiz!\n\n" +
-        "📌 **Jamoaviy ro'yxatdan o'tish**: 5 kishidan iborat jamoa tuzasiz (sardor + 4 a'zo).\n" +
-        "📌 **Individual ro'yxatdan o'tish**: Jamoasi bo'lmagan ishtirokchilar uchun.\n" +
-        "📌 **Mening jamoam**: Jamoa sardori uchun PDF ariza.\n\n" +
+        "📌 **Jamoaviy ro'yxatdan o'tish**: 5 kishidan iborat jamoa tuzasiz (sardor + 4 a'zo). Har bir a'zo uchun bo'lim va to'liq ism kiritiladi.\n" +
+        "📌 **Individual ro'yxatdan o'tish**: Jamoasi bo'lmagan ishtirokchilar uchun. Keyin admin tasodifiy jamoalarga guruhlaydi.\n" +
+        "📌 **Mening jamoam**: Agar siz jamoa sardori bo'lsangiz, jamoangizning arizasini PDF shaklida yuklab olishingiz mumkin.\n\n" +
         "Quyidagi tugmalar orqali ro'yxatdan o'ting:",
         { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
     );
@@ -356,18 +393,19 @@ bot.onText(/\/start/, (msg) => {
 
 bot.onText(/\/admin/, async (msg) => {
     const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(msg.from.id)) return bot.sendMessage(chatId, "⛔ Faqat adminlar.");
+    if (!ADMIN_IDS.includes(msg.from.id)) return bot.sendMessage(chatId, "⛔ Bu buyruq faqat adminlar uchun.");
 
-    const stats = `📊 **Statistika**\n• Jamoalar: ${db.teams.length}\n• Yakka ishtirokchilar: ${db.individuals.length}\n• Jami: ${db.teams.length * 5 + db.individuals.length}\n\nRo'yxat: ${db.registrationOpen ? "✅ Ochiq" : "🔴 Yopiq"}`;
+    const stats = `📊 **Statistika**\n• Jamoalar: ${db.teams.length}\n• Yakka ishtirokchilar: ${db.individuals.length}\n• Jami ishtirokchilar: ${db.teams.length * 5 + db.individuals.length}\n\nRo'yxatga olish holati: ${db.registrationOpen ? "✅ Ochiq" : "🔴 Yopiq"}`;
 
     const adminButtons = {
         reply_markup: {
             inline_keyboard: [
-                [{ text: "📋 Jamoalar", callback_data: "admin_teams" }],
-                [{ text: "👤 Yakkalar", callback_data: "admin_individuals" }],
-                [{ text: "🎲 Random jamoa", callback_data: "admin_random_teams" }],
-                [{ text: "📁 Barcha PDF (ZIP)", callback_data: "admin_export_zip" }],
-                [{ text: db.registrationOpen ? "🔒 Yopish" : "🔓 Ochish", callback_data: "admin_toggle" }]
+                [{ text: "📋 Jamoalar ro'yxati", callback_data: "admin_teams_list" }],
+                [{ text: "👤 Yakkalar ro'yxati", callback_data: "admin_individuals_list" }],
+                [{ text: "🎲 Tasodifiy jamoalar yaratish", callback_data: "admin_random_teams" }],
+                [{ text: "📁 Barcha arizalarni ZIP", callback_data: "admin_export_all_pdfs" }],
+                [{ text: db.registrationOpen ? "🔒 Ro'yxatni yopish" : "🔓 Ro'yxatni ochish", callback_data: "admin_toggle_registration" }],
+                [{ text: "🔄 Botni tozalash (RESET)", callback_data: "admin_reset_bot" }]
             ]
         }
     };
@@ -376,7 +414,7 @@ bot.onText(/\/admin/, async (msg) => {
 
 bot.onText(/\/cancel/, (msg) => {
     const chatId = msg.chat.id;
-    userSessions.delete(chatId);
+    if (userSessions.has(chatId)) userSessions.delete(chatId);
     bot.sendMessage(chatId, "Bekor qilindi.", getMainMenuKeyboard());
 });
 
@@ -387,7 +425,7 @@ bot.on('callback_query', async (query) => {
     const data = query.data;
     const session = userSessions.get(chatId);
     
-    // Darhol callback query ga javob berish (takroriy xabarlarni oldini olish)
+    // Darhol callback query ga javob berish (takroriy xabarlarning oldini olish)
     bot.answerCallbackQuery(query.id).catch(() => {});
     
     try {
@@ -396,113 +434,128 @@ bot.on('callback_query', async (query) => {
             await bot.sendMessage(chatId, "Bekor qilindi.", getMainMenuKeyboard());
             return;
         }
-        
+
         // Admin
         if (ADMIN_IDS.includes(userId)) {
-            if (data === 'admin_teams') {
-                let msg = db.teams.length ? "📋 Jamoalar:\n\n" + db.teams.map((t,i)=>`${i+1}. ${t.teamName}\n   Sardor: ${t.captainName}\n   Sana: ${new Date(t.createdAt).toLocaleDateString()}\n`).join('\n') : "Hech qanday jamoa yo'q";
-                await bot.sendMessage(chatId, msg);
+            if (data === 'admin_teams_list') {
+                if (db.teams.length === 0) await bot.sendMessage(chatId, "Hech qanday jamoa yo'q.");
+                else {
+                    let msg = "📋 **Jamoalar ro'yxati:**\n\n";
+                    db.teams.forEach((t, i) => {
+                        msg += `${i+1}. ${t.teamName}\n   Sardor: ${t.captainName}\n   A'zolar: ${t.members.length} kishi\n   Ro'yxatdan o'tgan: ${new Date(t.createdAt).toLocaleDateString('uz-UZ')}\n\n`;
+                    });
+                    await bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+                }
                 return;
             }
-            if (data === 'admin_individuals') {
-                let msg = db.individuals.length ? "👤 Yakkalar:\n\n" + db.individuals.map((ind,i)=>`${i+1}. ${ind.name} (${ind.department})`).join('\n') : "Hech qanday yakka yo'q";
-                await bot.sendMessage(chatId, msg);
+            if (data === 'admin_individuals_list') {
+                if (db.individuals.length === 0) await bot.sendMessage(chatId, "Hech qanday yakka ishtirokchi yo'q.");
+                else {
+                    let msg = "👤 **Yakka ishtirokchilar ro'yxati:**\n\n";
+                    db.individuals.forEach((ind, i) => {
+                        msg += `${i+1}. ${ind.name} (${ind.department})\n   Ro'yxatdan o'tgan: ${new Date(ind.registeredAt).toLocaleDateString('uz-UZ')}\n\n`;
+                    });
+                    await bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+                }
                 return;
             }
             if (data === 'admin_random_teams') {
                 await createRandomTeams(chatId, userId);
                 return;
             }
-            if (data === 'admin_export_zip') {
-                await bot.sendMessage(chatId, "⏳ ZIP tayyorlanmoqda...");
+            if (data === 'admin_export_all_pdfs') {
+                await bot.sendMessage(chatId, "⏳ Arizalar tayyorlanmoqda...");
                 try {
-                    const archiver = require('archiver');
                     const zipPath = path.join(__dirname, `arizalar_${Date.now()}.zip`);
                     const output = require('fs').createWriteStream(zipPath);
                     const archive = archiver('zip', { zlib: { level: 9 } });
                     output.on('close', async () => {
-                        await bot.sendDocument(chatId, zipPath, { filename: 'barcha_arizalar.zip', caption: `📦 Barcha arizalar (${db.teams.length} jamoa + ${db.individuals.length} yakka)` });
+                        await bot.sendDocument(chatId, zipPath, { filename: 'barcha_arizalar.zip', caption: `📦 Barcha arizalar (${db.teams.length} ta jamoa + ${db.individuals.length} ta yakka) zip faylda.` });
                         await fs.unlink(zipPath);
                     });
                     archive.pipe(output);
                     for (const team of db.teams) {
-                        const pdf = await generateApplicationPDF({
+                        const pdfBuffer = await generateApplicationPDF({
                             teamName: team.teamName,
                             captainName: team.captainName,
                             captainDepartment: team.captainDepartment,
-                            members: team.members
+                            members: team.members.map(m => ({ name: m.name, position: m.position, department: m.department }))
                         }, false);
-                        archive.append(pdf, { name: `jamoa_${team.teamId}.pdf` });
+                        archive.append(pdfBuffer, { name: `jamoa_${team.teamId}.pdf` });
                     }
                     for (const ind of db.individuals) {
-                        const pdf = await generateApplicationPDF({
+                        const pdfBuffer = await generateApplicationPDF({
                             name: ind.name,
                             department: ind.department,
                             position: ind.position,
                             registeredAt: ind.registeredAt
                         }, true);
-                        archive.append(pdf, { name: `individual_${ind.id}.pdf` });
+                        archive.append(pdfBuffer, { name: `individual_${ind.id}.pdf` });
                     }
                     await archive.finalize();
                 } catch (err) {
-                    await bot.sendMessage(chatId, `❌ ZIP yaratishda xatolik: ${err.message}`);
+                    console.error(err);
+                    await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
                 }
                 return;
             }
-            if (data === 'admin_toggle') {
+            if (data === 'admin_toggle_registration') {
                 db.registrationOpen = !db.registrationOpen;
                 await saveDB();
-                await bot.sendMessage(chatId, `Ro'yxat ${db.registrationOpen ? "ochiq" : "yopiq"}`);
+                await bot.sendMessage(chatId, `Ro'yxatga olish ${db.registrationOpen ? "ochiq" : "yopiq"}.`);
+                return;
+            }
+            if (data === 'admin_reset_bot') {
+                await resetBot(chatId);
                 return;
             }
         }
-        
-        // Bo'lim sahifalash
+
+        // Bo'lim sahifalash (4 ta sahifa)
         if (data.includes('_page_')) {
             const parts = data.split('_page_');
             const prefix = parts[0];
             const page = parseInt(parts[1]);
-            await showDepartmentsPaged(chatId, prefix, page);
+            await showDepartments(chatId, prefix, page);
             return;
         }
-        
-        // JAMOA: sardor bo'limi
+
+        // JAMOA YARATISH: bo'lim tanlash
         if (data.startsWith('team_captain_dept_') && !data.includes('_page_')) {
             const department = data.slice(18);
             if (!session || session.step !== 'awaiting_department') {
-                await bot.sendMessage(chatId, "Avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
+                await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
                 return;
             }
-            userSessions.set(chatId, { ...session, currentDepartment: department, currentRole: 'captain', step: 'awaiting_member_name', memberIndex: 1 });
-            await bot.sendMessage(chatId, "👨‍💼 Sardorning to'liq ismini kiriting:");
+            const newSession = { ...session, currentDepartment: department, currentRole: 'captain' };
+            await askMemberName(chatId, newSession, 1);
             return;
         }
         
-        // JAMOA: a'zo bo'limi
         if (data.startsWith('team_member_dept_') && !data.includes('_page_')) {
             const department = data.slice(17);
             if (!session || session.step !== 'awaiting_department') {
-                await bot.sendMessage(chatId, "Avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
+                await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
                 return;
             }
+            const newSession = { ...session, currentDepartment: department, currentRole: 'member' };
             const nextIndex = (session.members?.length || 0) + 1;
-            userSessions.set(chatId, { ...session, currentDepartment: department, currentRole: 'member', step: 'awaiting_member_name', memberIndex: nextIndex });
-            await bot.sendMessage(chatId, `👥 ${nextIndex}-a'zoning to'liq ismini kiriting:`);
+            await askMemberName(chatId, newSession, nextIndex);
             return;
         }
-        
-        // YAKKA: bo'lim
+
+        // YAKKA RO'YXAT: bo'lim tanlash
         if (data.startsWith('individual_dept_') && !data.includes('_page_')) {
             const department = data.slice(16);
             if (!session || session.step !== 'awaiting_department') {
-                await bot.sendMessage(chatId, "Avval 'Individual ro'yxatga olish' tugmasini bosing.");
+                await bot.sendMessage(chatId, "Iltimos, avval 'Individual ro'yxatga olish' tugmasini bosing.");
                 return;
             }
             userSessions.set(chatId, { step: 'awaiting_individual_name', department, userId });
-            await bot.sendMessage(chatId, "📝 To'liq ismingizni kiriting:");
+            await bot.sendMessage(chatId, "📝 Iltimos, to'liq ismingizni kiriting (rasmiy hujjatdagidek):");
             return;
         }
-        
+
     } catch (err) {
         console.error('Callback xatosi:', err);
         await bot.sendMessage(chatId, `❌ Xatolik: ${err.message}`);
@@ -515,36 +568,36 @@ bot.on('message', async (msg) => {
     const text = msg.text;
     const userId = msg.from.id;
     const session = userSessions.get(chatId);
-    
+
     // Asosiy menyu
     if (text === "👥 Jamoani ro'yxatga olish") {
-        if (!db.registrationOpen) return bot.sendMessage(chatId, "❌ Ro'yxat yopilgan.");
+        if (!db.registrationOpen) return bot.sendMessage(chatId, "❌ Ro'yxatga olish yopilgan.");
         if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
         userSessions.set(chatId, { step: 'awaiting_team_name', teamName: '', members: [], userId });
         return bot.sendMessage(chatId, "🏷 Jamoa nomini kiriting:");
     }
     if (text === "👤 Individual ro'yxatga olish") {
-        if (!db.registrationOpen) return bot.sendMessage(chatId, "Ro'yxat yopilgan.");
+        if (!db.registrationOpen) return bot.sendMessage(chatId, "Ro'yxatga olish yopilgan.");
         if (userSessions.has(chatId)) return bot.sendMessage(chatId, "Avvalgi jarayon tugallanmagan. /cancel");
         userSessions.set(chatId, { step: 'awaiting_department', userId });
-        await showDepartmentsPaged(chatId, 'individual_dept', 0);
+        await showDepartments(chatId, 'individual_dept', 0);
         return;
     }
     if (text === "📄 Mening jamoam") {
         const userTeam = db.teams.find(t => t.createdBy === userId);
-        if (!userTeam) return bot.sendMessage(chatId, "Siz jamoa sardori emassiz.");
-        const pdf = await generateApplicationPDF({
+        if (!userTeam) return bot.sendMessage(chatId, "Siz jamoa sardori emassiz yoki jamoa yaratmagansiz.");
+        const pdfBuffer = await generateApplicationPDF({
             teamName: userTeam.teamName,
             captainName: userTeam.captainName,
             captainDepartment: userTeam.captainDepartment,
-            members: userTeam.members
+            members: userTeam.members.map(m => ({ name: m.name, position: m.position, department: m.department }))
         }, false);
-        return bot.sendDocument(chatId, pdf, { filename: `ariya_${userTeam.teamId}.pdf`, contentType: 'application/pdf' });
+        return bot.sendDocument(chatId, pdfBuffer, { filename: `ariya_${userTeam.teamId}.pdf`, contentType: 'application/pdf', caption: `📄 "${userTeam.teamName}" jamoasi arizasi` });
     }
     if (text === "ℹ️ Yordam") {
-        return bot.sendMessage(chatId, "📌 **Yordam**\n• Jamoa: 5 a'zo (sardor + 4)\n• Yakka: o'zingizni ro'yxatga olish\n• Mening jamoam: PDF ariza\n• Admin: /admin\n• Bekor qilish: /cancel", { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, "📌 **Yordam**\n\n• **Jamoani ro'yxatga olish**: 5 a'zo (sardor + 4). Har bir a'zo uchun bo'lim va to'liq ism kiritiladi.\n• **Individual ro'yxatga olish**: o'zingizning bo'limingiz va ismingiz. Keyin admin tasodifiy jamoalarga guruhlaydi.\n• **Mening jamoam**: faqat jamoa sardori uchun PDF ariza yuklash.\n• **Admin**: /admin\n• **Bekor qilish**: /cancel", { parse_mode: 'Markdown' });
     }
-    
+
     // Jamoa nomi
     if (session && session.step === 'awaiting_team_name') {
         if (text.length > 50) return bot.sendMessage(chatId, "Nomi 50 belgidan oshmasin.");
@@ -552,32 +605,45 @@ bot.on('message', async (msg) => {
         session.step = 'awaiting_department';
         session.members = [];
         await bot.sendMessage(chatId, "Endi sardorning bo'limini tanlang:");
-        await showDepartmentsPaged(chatId, 'team_captain_dept', 0);
+        await showDepartments(chatId, 'team_captain_dept', 0);
         return;
     }
-    
+
     // A'zo ismini qabul qilish
     if (session && session.step === 'awaiting_member_name') {
         const name = text.trim();
-        if (name.length < 5) return bot.sendMessage(chatId, "❌ Kamida 5 harf.");
-        const emp = findEmployee(session.currentDepartment, name);
-        const newMember = { name: emp ? emp.name : name, position: emp ? emp.position : '', department: session.currentDepartment };
+        if (name.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
+        const department = session.currentDepartment;
+        const emp = findEmployee(department, name);
+        const finalName = emp ? emp.name : name;
+        const position = emp ? emp.position : '';
+        const newMember = { name: finalName, position: position, department: department };
         session.members.push(newMember);
-        
-        if (session.members.length === 5) {
-            await finalizeTeam(chatId, userId, session);
+
+        if (session.currentRole === 'captain') {
+            if (session.members.length < 5) {
+                session.currentRole = 'member';
+                await bot.sendMessage(chatId, `✅ Sardor qo'shildi. Endi 2-a'zoning bo'limini tanlang:`);
+                await showDepartments(chatId, 'team_member_dept', 0);
+            } else {
+                await finalizeTeam(chatId, userId, session);
+            }
         } else {
-            const nextIndex = session.members.length + 1;
-            await bot.sendMessage(chatId, `✅ A'zo qo'shildi. Endi ${nextIndex}-a'zoning bo'limini tanlang:`);
-            await showDepartmentsPaged(chatId, 'team_member_dept', 0);
+            if (session.members.length < 5) {
+                const nextIndex = session.members.length + 1;
+                await bot.sendMessage(chatId, `✅ A'zo qo'shildi. Endi ${nextIndex}-a'zoning bo'limini tanlang:`);
+                await showDepartments(chatId, 'team_member_dept', 0);
+            } else {
+                await finalizeTeam(chatId, userId, session);
+            }
         }
         return;
     }
-    
-    // Yakka ro'yxat: ism
+
+    // Yakka ro'yxat: ism kiritish
     if (session && session.step === 'awaiting_individual_name') {
         const name = text.trim();
-        if (name.length < 5) return bot.sendMessage(chatId, "❌ Kamida 5 harf.");
+        if (name.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
         await finalizeIndividual(chatId, userId, session.department, name);
         return;
     }
@@ -587,6 +653,6 @@ bot.on('message', async (msg) => {
 const app = express();
 app.get('/', (req, res) => res.send('Zakovat bot ishlayapti'));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`HTTP ${PORT}`));
+app.listen(PORT, () => console.log(`HTTP server ${PORT} portda`));
 
 loadData().then(() => console.log('✅ Bot ishga tushdi')).catch(console.error);
