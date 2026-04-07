@@ -48,7 +48,7 @@ async function loadData() {
 }
 async function saveDB() { await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf8'); }
 
-// -------------------- PDF ARIZA (Times New Roman, jadval, imzolar) --------------------
+// -------------------- PDF ARIZA (imzo chap tomonda) --------------------
 async function generateApplicationPDF(teamData, isIndividual = false) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -57,7 +57,6 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        // Times New Roman shriftlari
         doc.font('Times-Roman');
         doc.fontSize(18).font('Times-Bold').text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
         doc.moveDown(0.5);
@@ -70,6 +69,11 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
             doc.text(`Yoshi: ${teamData.age}`);
             doc.text(`Bo'lim: ${teamData.department}`);
             doc.text(`Ro'yxatga olingan sana: ${new Date(teamData.registeredAt).toLocaleDateString('uz-UZ')}`);
+            doc.moveDown(3);
+            // Sana o'ngda, imzo chapda
+            doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
+            doc.moveDown(1);
+            doc.text('Ishtirokchi imzosi: ____________________', { align: 'left' });
         } else {
             doc.text(`Jamoa nomi: ${teamData.teamName}`, { underline: true });
             doc.text(`Sardor: ${teamData.captainName} (yoshi ${teamData.captainAge})`);
@@ -112,16 +116,13 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
                     doc.font('Times-Roman');
                 }
             }
-        }
 
-        doc.moveDown(2);
-        doc.font('Times-Roman');
-        doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
-        doc.moveDown(0.5);
-        if (isIndividual) {
-            doc.text('Ishtirokchi imzosi: ____________________', { align: 'right' });
-        } else {
-            doc.text('Rahbar yoki jamoa sardori imzosi: _________________', { align: 'left' });
+            doc.moveDown(3);
+            // Sana o'ng tomonda
+            doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
+            doc.moveDown(1);
+            // Imzo chap tomonda
+            doc.text('Rahbar yoki jamoa sardori imzosi: ____________________', { align: 'left' });
         }
         doc.end();
     });
