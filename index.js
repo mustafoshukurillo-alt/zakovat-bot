@@ -72,7 +72,7 @@ async function generateTeamApplicationPDF(teamData) {
         // Jadval sarlavhasi
         const startY = doc.y;
         doc.font('Times-Bold');
-        doc.text('№', 50, startY);
+        doc.text('T/r', 50, startY);
         doc.text('F.I.SH.', 80, startY);
         doc.text('Yoshi', 250, startY);
         doc.text('Bo‘lim', 300, startY);
@@ -150,9 +150,9 @@ async function showDepartments(chatId, prefix, page = 0) {
 // -------------------- JAMOA YARATISH --------------------
 async function askMemberName(chatId, session, memberNumber) {
     if (memberNumber === 1) {
-        await bot.sendMessage(chatId, "👨‍💼 Sardorning to‘liq ismini kiriting (F.I.SH.):");
+        await bot.sendMessage(chatId, "👨‍💼 Jamoa sardorining to‘liq ismini kiriting (F.I.SH. masalan: Aliyev Vali Aliyevich):");
     } else {
-        await bot.sendMessage(chatId, `👥 ${memberNumber}-a'zoning to‘liq ismini kiriting:`);
+        await bot.sendMessage(chatId, `👥 ${memberNumber}-a'zoning to‘liq ismini kiriting (F.I.SH. masalan: Aliyev Vali Aliyevich):`);
     }
     userSessions.set(chatId, { ...session, step: 'awaiting_name', memberIndex: memberNumber });
 }
@@ -269,7 +269,7 @@ async function finalizeIndividual(chatId, userId, deptId, name, age) {
     db.individuals.push(newIndividual);
     await saveDB();
 
-    await bot.sendMessage(chatId, `✅ Siz individual ro'yxatdan o'tdingiz!\n\n📌 Ma'lumotlaringiz saqlandi. Admin tasodifiy jamoalarga guruhlagach, sizga jamoa sardori etib tayinlangan taqdirda xabar keladi.`, getMainMenuKeyboard());
+    await bot.sendMessage(chatId, `✅ Siz individual ro'yxatdan o'tdingiz!\n\n📌 Ma'lumotlaringiz saqlandi. Tizim tasodifiy jamoalarga guruhlagach, sizga jamoa sardori etib tayinlangan taqdirda xabar keladi.`, getMainMenuKeyboard());
     userSessions.delete(chatId);
 }
 
@@ -592,7 +592,7 @@ bot.on('message', async (msg) => {
     // Ism (jamoa)
     if (session && session.step === 'awaiting_name') {
         const name = text.trim();
-        if (name.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
+        if (name.length < 10) return bot.sendMessage(chatId, "❌ Ism familiya kamida 10 belgidan iborat bo'lishi kerak.");
         session.currentName = name;
         userSessions.set(chatId, { ...session, step: 'awaiting_age' });
         await bot.sendMessage(chatId, "📅 Yoshingizni kiriting (masalan: 25):");
@@ -602,7 +602,7 @@ bot.on('message', async (msg) => {
     // Yosh (jamoa)
     if (session && session.step === 'awaiting_age') {
         const age = parseInt(text);
-        if (isNaN(age) || age < 16 || age > 100) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-100 oralig'ida).");
+        if (isNaN(age) || age < 16 || age > 35) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-35 oralig'ida).");
         const department = departments.departments.find(d => d.id === session.currentDeptId).name;
         const newMember = { name: session.currentName, age: age, department: department, departmentId: session.currentDeptId };
         const members = [...(session.members || []), newMember];
@@ -612,7 +612,7 @@ bot.on('message', async (msg) => {
                 await finalizeTeam(chatId, userId, { ...session, members });
             } else {
                 userSessions.set(chatId, { ...session, members, step: 'awaiting_department' });
-                await bot.sendMessage(chatId, `✅ Sardor qo'shildi. Endi 2-a'zoning bo'limini tanlang:`);
+                await bot.sendMessage(chatId, `✅ Jamoa sardori qo'shildi. Endi 2-a'zoning bo'limini tanlang:`);
                 await showDepartments(chatId, 'team_member_dept', 0);
             }
         } else {
@@ -631,7 +631,7 @@ bot.on('message', async (msg) => {
     // Individual ro'yxat: ism
     if (session && session.step === 'awaiting_individual_name') {
         const name = text.trim();
-        if (name.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
+        if (name.length < 10) return bot.sendMessage(chatId, "❌ Ism familiya kamida 10 belgidan iborat bo'lishi kerak.");
         session.individualName = name;
         userSessions.set(chatId, { ...session, step: 'awaiting_individual_age' });
         await bot.sendMessage(chatId, "📅 Yoshingizni kiriting (masalan: 25):");
@@ -641,7 +641,7 @@ bot.on('message', async (msg) => {
     // Individual ro'yxat: yosh
     if (session && session.step === 'awaiting_individual_age') {
         const age = parseInt(text);
-        if (isNaN(age) || age < 16 || age > 100) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-100 oralig'ida).");
+        if (isNaN(age) || age < 16 || age > 35) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-35 oralig'ida).");
         await finalizeIndividual(chatId, userId, session.deptId, session.individualName, age);
         return;
     }
@@ -670,7 +670,7 @@ bot.on('message', async (msg) => {
     // Tahrirlash: a'zo ismi
     if (session && session.step === 'edit_member_name') {
         const name = text.trim();
-        if (name.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
+        if (name.length < 10) return bot.sendMessage(chatId, "❌ Ism familiya kamida 10 belgidan iborat bo'lishi kerak.");
         session.newName = name;
         userSessions.set(chatId, { ...session, step: 'edit_member_age' });
         await bot.sendMessage(chatId, "📅 Yangi yoshni kiriting:");
@@ -680,7 +680,7 @@ bot.on('message', async (msg) => {
     // Tahrirlash: a'zo yoshi
     if (session && session.step === 'edit_member_age') {
         const age = parseInt(text);
-        if (isNaN(age) || age < 16 || age > 100) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-100 oralig'ida).");
+        if (isNaN(age) || age < 16 || age > 35) return bot.sendMessage(chatId, "❌ Yoshingizni to'g'ri kiriting (16-35 oralig'ida).");
         const team = db.teams.find(t => t.teamId === session.teamId);
         if (!team) return bot.sendMessage(chatId, "❌ Jamoa topilmadi.");
         await editMember(chatId, team, session.memberIndex, session.newName, age, session.currentDeptId);
