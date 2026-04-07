@@ -45,27 +45,7 @@ async function loadData() {
         console.log('✅ departments.json yuklandi, bo\'limlar:', departments.departments.length);
     } catch (err) {
         console.error('departments.json xatosi:', err.message);
-        // Fallback: hardcoded departments
-        departments.departments = [
-            { id: 1, name: "Asbobsozlik sexi" }, { id: 2, name: "Avtobuslar yig'ish sexi" },
-            { id: 3, name: "Axborot-kommunikatsiya texnologiyalari va axborot xavfsizligi bo'limi" },
-            { id: 4, name: "Bo'yash sexi" }, { id: 5, name: "Buxgalteriya hisobi departamenti" },
-            { id: 6, name: "Elektr jabduqlar ishlab chiqarish sexi" }, { id: 7, name: "ERP-mahsulotni boshqarish bo'limi" },
-            { id: 8, name: "Integratsiya guruhi" }, { id: 9, name: "Integratsiyalashgan boshqaruv tizimi bo'limi" },
-            { id: 10, name: "Ishlab chiqarish jarayonlarini optimallashtirish bo'limi" },
-            { id: 11, name: "Ishlab chiqarish-mexanika sexi" }, { id: 12, name: "Ishlab chiqarishni rejalashtirish departamenti" },
-            { id: 13, name: "Istiqbol ishlanmalar departamenti" }, { id: 14, name: "Konstruktorlik ishlanmalar departamenti" },
-            { id: 15, name: "Kuzovlar ishlab chiqarish sexi" }, { id: 16, name: "Ma'muriy masalalar departamenti" },
-            { id: 17, name: "Markaziy zavod laboratoriyasi" }, { id: 18, name: "Marketing departamenti" },
-            { id: 19, name: "Mehnat muhofazasi, texnika xavfsizligi va yong'in xavfsizligi bo'limi" },
-            { id: 20, name: "Moddiy ta'minot departamenti" }, { id: 21, name: "Moliya-iqtisod departamenti" },
-            { id: 22, name: "Muhandislik ta'minoti departamenti" }, { id: 23, name: "Payvandlash sexi" },
-            { id: 24, name: "Plastmass detallar ishlab chiqarish sexi" }, { id: 25, name: "Rahbarlar yordamchilari" },
-            { id: 26, name: "Savdo va sotishdan keyingi xizmat departamenti" }, { id: 27, name: "Sifat nazorati departamenti" },
-            { id: 28, name: "Shassi va kabinalarni yig'ish sexi" }, { id: 30, name: "Tayyorlov sexi" },
-            { id: 31, name: "Texnologik ta'minot departamenti" }, { id: 32, name: "Xavfsizlik bo'limi" },
-            { id: 33, name: "Xodimlarni boshqarish (HR) departamenti" }, { id: 34, name: "Yuk avtomobillari kuzovlarini yig'ish sexi" }
-        ];
+        process.exit(1);
     }
     try {
         const empRaw = await fs.readFile(EMPLOYEES_PATH, 'utf8');
@@ -86,14 +66,29 @@ function getDepartmentName(id) {
 function getEmployee(id) {
     return employees.employees.find(e => e.id === id);
 }
+function getEmployeeName(id) {
+    const e = getEmployee(id);
+    return e ? e.name : `ID:${id}`;
+}
+function getEmployeePosition(id) {
+    const e = getEmployee(id);
+    return e ? e.position : '';
+}
+function getEmployeeDepartment(id) {
+    const e = getEmployee(id);
+    return e ? getDepartmentName(e.departmentId) : '';
+}
 function isEmployeeAvailable(employeeId) {
     const inTeam = db.teams.some(t => t.members.some(m => m.id === employeeId));
     const inIndividual = db.individuals.some(ind => ind.employeeId === employeeId);
     return !inTeam && !inIndividual;
 }
 function getEmployeesByDepartment(deptId, excludeIds = [], page = 0, pageSize = 5) {
-    const all = employees.employees.filter(e => e.departmentId === deptId && isEmployeeAvailable(e.id) && !excludeIds.includes(e.id))
-        .sort((a,b) => a.name.localeCompare(b.name));
+    // departmentId ni raqamga o'tkazib solishtirish
+    const all = employees.employees.filter(e => {
+        const eDeptId = typeof e.departmentId === 'number' ? e.departmentId : parseInt(e.departmentId);
+        return eDeptId === deptId && isEmployeeAvailable(e.id) && !excludeIds.includes(e.id);
+    }).sort((a,b) => a.name.localeCompare(b.name));
     const start = page * pageSize;
     return {
         items: all.slice(start, start + pageSize),
@@ -103,7 +98,7 @@ function getEmployeesByDepartment(deptId, excludeIds = [], page = 0, pageSize = 
     };
 }
 
-// -------------------- PDF ARIZA (faqat sana va imzo) --------------------
+// -------------------- PDF ARIZA (sana, imzo, muhri yo'q) --------------------
 async function generateApplicationPDF(teamData, isIndividual = false) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -111,7 +106,7 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
         doc.on('data', chunk => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
-        doc.fontSize(18).text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
+        doc.fontSize(18).font('Helvetica-Bold').text('SAM AUTO ZAKOVAT TURNIRI', { align: 'center' });
         doc.moveDown(0.5).fontSize(16).text('QATNASHISH UCHUN ARIZA', { align: 'center' });
         doc.moveDown(1.5);
         if (isIndividual) {
@@ -143,13 +138,17 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
                 doc.text(m.department, 350, currentY+5, { width: 90 });
                 doc.text('__________', 450, currentY+5);
                 currentY += 25;
-                if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta */ }
+                if (currentY > 700) { doc.addPage(); currentY = 50; }
             }
         }
         doc.moveDown(2);
         doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
         doc.moveDown(0.5);
-        doc.text(isIndividual ? 'Ishtirokchi imzosi: ____________________' : 'Sardor imzosi: ____________________', { align: 'right' });
+        if (isIndividual) {
+            doc.text('Ishtirokchi imzosi: ____________________', { align: 'right' });
+        } else {
+            doc.text('Sardor imzosi: ____________________', { align: 'right' });
+        }
         doc.end();
     });
 }
@@ -208,6 +207,15 @@ async function showEmployees(chatId, deptId, action, teamCreationData, userId, e
 }
 
 // -------------------- JAMOA YARATISH --------------------
+async function askMemberName(chatId, session, memberNumber) {
+    if (memberNumber === 1) {
+        await bot.sendMessage(chatId, "👨‍💼 Sardorning to‘liq ismini kiriting (rasmiy hujjatdagidek):");
+    } else {
+        await bot.sendMessage(chatId, `👥 ${memberNumber}-a'zoning to‘liq ismini kiriting:`);
+    }
+    userSessions.set(chatId, { ...session, step: 'awaiting_member_name', memberIndex: memberNumber });
+}
+
 async function finalizeTeam(chatId, userId, session) {
     const { teamName, members } = session;
     if (members.length !== 5) {
@@ -239,7 +247,14 @@ async function finalizeTeam(chatId, userId, session) {
 
 // -------------------- YAKKA RO'YXAT --------------------
 async function finalizeIndividual(chatId, userId, deptId, name) {
-    const emp = employees.employees.find(e => e.departmentId === deptId && e.name.toLowerCase() === name.trim().toLowerCase());
+    // Xodimni qidirish (to'liq mos yoki qisman)
+    const emp = employees.employees.find(e => {
+        const eDeptId = typeof e.departmentId === 'number' ? e.departmentId : parseInt(e.departmentId);
+        return eDeptId === deptId && e.name.toLowerCase() === name.trim().toLowerCase();
+    }) || employees.employees.find(e => {
+        const eDeptId = typeof e.departmentId === 'number' ? e.departmentId : parseInt(e.departmentId);
+        return eDeptId === deptId && e.name.toLowerCase().includes(name.trim().toLowerCase());
+    });
     const finalName = emp ? emp.name : name;
     const position = emp ? emp.position : '';
     const newIndividual = {
@@ -318,7 +333,7 @@ async function createRandomTeams(chatId, userId) {
     return true;
 }
 
-// -------------------- BOTNI TOZALASH --------------------
+// -------------------- RESET --------------------
 async function resetBot(chatId) {
     db = { teams: [], individuals: [], registrationOpen: true };
     await saveDB();
@@ -338,7 +353,7 @@ async function resetBot(chatId) {
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id,
         "Assalomu alaykum! Siz SamAuto Zakovat o'yinida ro'yxatdan o'tish botiga xush keldingiz!\n\n" +
-        "📌 **Jamoaviy ro'yxatdan o'tish**: 5 kishidan iborat jamoa tuzasiz (sardor + 4 a'zo). Har bir a'zo uchun bo'lim va ism tanlanadi.\n" +
+        "📌 **Jamoaviy ro'yxatdan o'tish**: 5 kishidan iborat jamoa tuzasiz (sardor + 4 a'zo).\n" +
         "📌 **Individual ro'yxatdan o'tish**: Jamoasi bo'lmagan ishtirokchilar uchun. Keyin admin tasodifiy jamoalarga guruhlaydi.\n" +
         "📌 **Mening jamoam**: Agar siz jamoa sardori bo'lsangiz, jamoangizning arizasini PDF shaklida yuklab olishingiz mumkin.\n\n" +
         "Quyidagi tugmalar orqali ro'yxatdan o'ting:",
@@ -456,7 +471,8 @@ bot.on('callback_query', async (query) => {
                 await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
                 return;
             }
-            userSessions.set(chatId, { ...session, currentDeptId: deptId, currentRole: 'captain', step: 'selecting_employee' });
+            const newSession = { ...session, currentDeptId: deptId, currentRole: 'captain' };
+            userSessions.set(chatId, { ...newSession, step: 'selecting_employee' });
             await showEmployees(chatId, deptId, 'captain', session.teamCreationData, userId, [], 0);
             return;
         }
@@ -467,7 +483,8 @@ bot.on('callback_query', async (query) => {
                 return;
             }
             const excludeIds = (session.members || []).map(m => m.id);
-            userSessions.set(chatId, { ...session, currentDeptId: deptId, currentRole: 'member', step: 'selecting_employee' });
+            const newSession = { ...session, currentDeptId: deptId, currentRole: 'member' };
+            userSessions.set(chatId, { ...newSession, step: 'selecting_employee' });
             await showEmployees(chatId, deptId, 'member', session.teamCreationData, userId, excludeIds, 0);
             return;
         }
@@ -573,7 +590,7 @@ bot.on('message', async (msg) => {
         return bot.sendDocument(chatId, pdf, { filename: `ariya_${userTeam.teamId}.pdf`, contentType: 'application/pdf', caption: `📄 "${userTeam.teamName}" jamoasi arizasi` });
     }
     if (text === "ℹ️ Yordam") {
-        return bot.sendMessage(chatId, "📌 **Yordam**\n\n• Jamoani ro'yxatga olish: 5 a'zo (sardor + 4).\n• Individual ro'yxatga olish: o'zingizni ro'yxatdan o'tkazing.\n• Mening jamoam: PDF ariza yuklash.\n• Admin: /admin\n• Bekor qilish: /cancel", { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, "📌 **Yordam**\n\n• Jamoani ro'yxatga olish: 5 a'zo (sardor + 4).\n• Individual ro'yxatga olish: o'zingizni ro'yxatdan o'tkazing, keyin admin tasodifiy jamoalarga guruhlaydi.\n• Mening jamoam: PDF ariza yuklash.\n• Admin: /admin\n• Bekor qilish: /cancel", { parse_mode: 'Markdown' });
     }
     // Jamoa nomi
     if (session && session.step === 'awaiting_team_name') {
