@@ -27,7 +27,7 @@ const EMPLOYEES_PATH = path.join(__dirname, 'employees.json');
 let db = { teams: [], individuals: [], registrationOpen: true };
 let departments = { departments: [] };
 let employees = { employees: [] };
-const userSessions = new Map(); // { chatId: { step, teamName, members, currentDeptId, currentRole, ... } }
+const userSessions = new Map();
 
 // -------------------- YUKLASH --------------------
 async function loadData() {
@@ -73,10 +73,6 @@ function getEmployeeName(id) {
 function getEmployeePosition(id) {
     const e = getEmployee(id);
     return e ? e.position : '';
-}
-function getEmployeeDepartment(id) {
-    const e = getEmployee(id);
-    return e ? getDepartmentName(e.departmentId) : '';
 }
 function isEmployeeAvailable(employeeId) {
     const inTeam = db.teams.some(t => t.members.some(m => m.id === employeeId));
@@ -135,7 +131,7 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
                 doc.text(m.department, 350, currentY+5, { width: 90 });
                 doc.text('__________', 450, currentY+5);
                 currentY += 25;
-                if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta */ }
+                if (currentY > 700) { doc.addPage(); currentY = 50; }
             }
         }
         doc.moveDown(2);
@@ -262,7 +258,7 @@ async function finalizeIndividual(chatId, userId, deptId, name) {
     userSessions.delete(chatId);
 }
 
-// -------------------- TASODIFIY JAMOA YARATISH (YAKKALARDAN) --------------------
+// -------------------- TASODIFIY JAMOA YARATISH --------------------
 async function createRandomTeams(chatId, userId) {
     if (db.individuals.length < 5) {
         await bot.sendMessage(chatId, "❌ Tasodifiy jamoa yaratish uchun kamida 5 ta yakka ishtirokchi kerak.");
@@ -585,6 +581,7 @@ bot.on('message', async (msg) => {
         await showDepartments(chatId, 'team_captain_dept', 0);
         return;
     }
+    // A'zo ismini qabul qilish (bu qism ishlatilmaydi, chunki xodimlar inline tanlanadi)
     // Yakka ro'yxat: ism
     if (session && session.step === 'awaiting_individual_name') {
         if (text.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
