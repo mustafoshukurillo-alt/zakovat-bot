@@ -74,12 +74,16 @@ function getEmployeePosition(id) {
     const e = getEmployee(id);
     return e ? e.position : '';
 }
+function getEmployeeDepartment(id) {
+    const e = getEmployee(id);
+    return e ? getDepartmentName(e.departmentId) : '';
+}
 function isEmployeeAvailable(employeeId) {
     const inTeam = db.teams.some(t => t.members.some(m => m.id === employeeId));
     const inIndividual = db.individuals.some(ind => ind.employeeId === employeeId);
     return !inTeam && !inIndividual;
 }
-function getEmployeesByDepartment(deptId, excludeIds = [], page = 0, pageSize = 10) {
+function getEmployeesByDepartment(deptId, excludeIds = [], page = 0, pageSize = 5) {
     const all = employees.employees.filter(e => e.departmentId === deptId && isEmployeeAvailable(e.id) && !excludeIds.includes(e.id))
         .sort((a,b) => a.name.localeCompare(b.name));
     const start = page * pageSize;
@@ -131,7 +135,7 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
                 doc.text(m.department, 350, currentY+5, { width: 90 });
                 doc.text('__________', 450, currentY+5);
                 currentY += 25;
-                if (currentY > 700) { doc.addPage(); currentY = 50; }
+                if (currentY > 700) { doc.addPage(); currentY = 50; /* sarlavha qayta */ }
             }
         }
         doc.moveDown(2);
@@ -175,11 +179,14 @@ async function showDepartments(chatId, prefix, page = 0) {
     userSessions.set(chatId, { ...sess, deptPage: page });
 }
 
-// -------------------- XODIMLARNI SAHIFALASH (10 tadan) --------------------
+// -------------------- XODIMLARNI SAHIFALASH (5 tadan) --------------------
 async function showEmployees(chatId, deptId, action, teamCreationData, userId, excludeIds, page = 0) {
-    const { items, total, totalPages } = getEmployeesByDepartment(deptId, excludeIds, page, 10);
+    const { items, total, totalPages } = getEmployeesByDepartment(deptId, excludeIds, page, 5);
     if (items.length === 0) {
         await bot.sendMessage(chatId, `❌ Bu bo'limda mavjud xodim yo'q.`);
+        // Qaytadan bo'limlarga qaytish opsiyasini beramiz
+        const backBtn = { reply_markup: { inline_keyboard: [[{ text: "⬅️ Bo'limlarga qaytish", callback_data: "back_to_depts" }]] } };
+        await bot.sendMessage(chatId, "Iltimos, boshqa bo'lim tanlang yoki bekor qiling.", backBtn);
         return;
     }
     const buttons = items.map(emp => ([{ text: emp.name, callback_data: `emp_${action}_${emp.id}` }]));
@@ -258,7 +265,7 @@ async function finalizeIndividual(chatId, userId, deptId, name) {
     userSessions.delete(chatId);
 }
 
-// -------------------- TASODIFIY JAMOA YARATISH --------------------
+// -------------------- TASODIFIY JAMOA YARATISH (YAKKALARDAN) --------------------
 async function createRandomTeams(chatId, userId) {
     if (db.individuals.length < 5) {
         await bot.sendMessage(chatId, "❌ Tasodifiy jamoa yaratish uchun kamida 5 ta yakka ishtirokchi kerak.");
@@ -452,8 +459,8 @@ bot.on('callback_query', async (query) => {
                 return;
             }
             const newSession = { ...session, currentDeptId: deptId, currentRole: 'captain' };
-            await showEmployees(chatId, deptId, 'captain', newSession.teamCreationData, userId, [], 0);
             userSessions.set(chatId, { ...newSession, step: 'selecting_employee' });
+            await showEmployees(chatId, deptId, 'captain', session.teamCreationData, userId, [], 0);
             return;
         }
         if (data.startsWith('team_member_dept_')) {
@@ -462,9 +469,10 @@ bot.on('callback_query', async (query) => {
                 await bot.sendMessage(chatId, "Iltimos, avval 'Jamoani ro'yxatga olish' tugmasini bosing.");
                 return;
             }
+            const excludeIds = (session.members || []).map(m => m.id);
             const newSession = { ...session, currentDeptId: deptId, currentRole: 'member' };
-            await showEmployees(chatId, deptId, 'member', newSession.teamCreationData, userId, session.members.map(m=>m.id), 0);
             userSessions.set(chatId, { ...newSession, step: 'selecting_employee' });
+            await showEmployees(chatId, deptId, 'member', session.teamCreationData, userId, excludeIds, 0);
             return;
         }
         // Xodim tanlash
@@ -581,7 +589,6 @@ bot.on('message', async (msg) => {
         await showDepartments(chatId, 'team_captain_dept', 0);
         return;
     }
-    // A'zo ismini qabul qilish (bu qism ishlatilmaydi, chunki xodimlar inline tanlanadi)
     // Yakka ro'yxat: ism
     if (session && session.step === 'awaiting_individual_name') {
         if (text.length < 5) return bot.sendMessage(chatId, "❌ Ism familiya kamida 5 belgidan iborat bo'lishi kerak.");
