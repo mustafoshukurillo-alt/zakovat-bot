@@ -48,7 +48,7 @@ async function loadData() {
 }
 async function saveDB() { await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf8'); }
 
-// -------------------- PDF ARIZA (imzo chap tomonda) --------------------
+// -------------------- PDF ARIZA (imzo chap tomonda - koordinata bilan) --------------------
 async function generateApplicationPDF(teamData, isIndividual = false) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -70,17 +70,15 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
             doc.text(`Bo'lim: ${teamData.department}`);
             doc.text(`Ro'yxatga olingan sana: ${new Date(teamData.registeredAt).toLocaleDateString('uz-UZ')}`);
             doc.moveDown(3);
-            // Sana o'ngda, imzo chapda
             doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
             doc.moveDown(1);
-            doc.text('Ishtirokchi imzosi: ____________________', { align: 'left' });
+            doc.text('Ishtirokchi imzosi: ____________________', 50, doc.y);
         } else {
             doc.text(`Jamoa nomi: ${teamData.teamName}`, { underline: true });
             doc.text(`Sardor: ${teamData.captainName} (yoshi ${teamData.captainAge})`);
             doc.text(`A'zolar soni: ${teamData.members.length} nafar`);
             doc.moveDown(1);
 
-            // Jadval sarlavhasi
             const startY = doc.y;
             doc.font('Times-Bold');
             doc.text('№', 50, startY);
@@ -118,11 +116,10 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
             }
 
             doc.moveDown(3);
-            // Sana o'ng tomonda
             doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')}`, { align: 'right' });
             doc.moveDown(1);
-            // Imzo chap tomonda
-            doc.text('Rahbar yoki jamoa sardori imzosi: ____________________', { align: 'left' });
+            // Imzo chap tomonda (x=50)
+            doc.text('Rahbar yoki jamoa sardori imzosi: ____________________', 50, doc.y);
         }
         doc.end();
     });
