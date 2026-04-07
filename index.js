@@ -121,7 +121,7 @@ async function generateApplicationPDF(teamData, isIndividual = false) {
         if (isIndividual) {
             doc.text('Ishtirokchi imzosi: ____________________', { align: 'right' });
         } else {
-            doc.text('Sardor imzosi: ____________________', { align: 'right' });
+            doc.text('Rahbar yoki jamoa sardori imzosi: _________________', { align: 'left' });
         }
         doc.end();
     });
